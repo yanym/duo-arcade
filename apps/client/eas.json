@@ -1,0 +1,31 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://duo-arcade.yimgyan.workers.dev",
+        "EXPO_PUBLIC_WEB_URL": "https://duo-arcade.yimgyan.workers.dev"
+      },
+      "ios": {
+        "buildConfiguration": "Release"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://duo-arcade.yimgyan.workers.dev",
+        "EXPO_PUBLIC_WEB_URL": "https://duo-arcade.yimgyan.workers.dev"
+      },
+      "ios": {
+        "buildConfiguration": "Release"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

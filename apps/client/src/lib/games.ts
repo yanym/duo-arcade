@@ -1,0 +1,427 @@
+import { roundsForLength, turnDurationForPace, type GameId, type GameOptions } from "@duo/game-core";
+
+export type GameInfo = {
+  id: GameId;
+  title: string;
+  icon: string;
+  description: string;
+  meta: string;
+  mode: "竞争" | "合作";
+  accent: "primary" | "coral" | "teal";
+  rules: string;
+  optionKeys: (keyof GameOptions)[];
+  tutorialSteps: string[];
+  proTip: string;
+};
+
+export const GAMES: GameInfo[] = [
+  {
+    id: "gomoku",
+    title: "五子棋",
+    icon: "●○",
+    description: "轮流落子，率先在任意方向连成五子。",
+    meta: "竞争 · 3–8 分钟",
+    mode: "竞争",
+    accent: "primary",
+    rules: "黑方先手，每回合 30 秒；横、竖或斜线率先连成五子获胜。",
+    optionKeys: ["pace"],
+    tutorialSteps: ["看顶部状态确认是否轮到你", "点击空交叉点落下自己的棋子", "横、竖或斜线连成五子即可获胜"],
+    proTip: "同时制造两条威胁，比只追一条长线更难防守。",
+  },
+  {
+    id: "split_maze",
+    title: "分控迷宫",
+    icon: "↕↔",
+    description: "一人只管上下，一人只管左右，合作走出迷宫。",
+    meta: "合作 · 1–3 分钟",
+    mode: "合作",
+    accent: "teal",
+    rules: "在 75 秒内到达旗帜。两人分别控制纵向和横向，每局交换控制权。",
+    optionKeys: ["pace", "difficulty"],
+    tutorialSteps: ["确认自己负责上下还是左右", "观察完整迷宫并告诉搭档下一步", "在共同倒计时结束前抵达旗帜"],
+    proTip: "先一起扫一眼路线，遇到连续同方向路段时让对应玩家快速接手。",
+  },
+  {
+    id: "reversi",
+    title: "黑白棋",
+    icon: "◐",
+    description: "夹住并翻转对方棋子，终局棋子多者获胜。",
+    meta: "竞争 · 5–12 分钟",
+    mode: "竞争",
+    accent: "coral",
+    rules: "落子必须夹住至少一枚对方棋子；无合法位置会自动跳过，双方都无棋可下时结算。",
+    optionKeys: ["pace"],
+    tutorialSteps: ["轮到你时寻找带提示的合法位置", "落子会翻转被两端夹住的对方棋子", "双方都无处可下时，棋子更多者获胜"],
+    proTip: "角落不会再被翻走，通常比眼前多翻几枚更有价值。",
+  },
+  {
+    id: "sync_tap",
+    title: "同频挑战",
+    icon: "✦✦",
+    description: "不看对方提示，同时按下按钮，测出你们的默契。",
+    meta: "合作 · 1 分钟",
+    mode: "合作",
+    accent: "primary",
+    rules: "倒计时结束后各按一次，共 5 轮；服务器按两次点击的时间差计算默契分。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["倒计时阶段保持手指准备", "出现“现在按”后凭感觉击拍一次", "对方时机保密，完成全部轮次看默契分"],
+    proTip: "约定不要出声倒数，专注同一个视觉节奏更公平也更有趣。",
+  },
+  {
+    id: "cover_hunt",
+    title: "掩体猎手",
+    icon: "⌖👾",
+    description: "潜行者秘密躲藏，猎手扫描信号并押注唯一一枪。",
+    meta: "非对称竞争 · 2–5 分钟",
+    mode: "竞争",
+    accent: "teal",
+    rules: "双方轮流担任潜行者与猎手。潜行者选择掩体；猎手可先扫描再开一枪，命中猎手得分，否则潜行者得分。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["潜行者秘密选择一处掩体", "猎手用有限扫描获得冷热线索", "猎手押注唯一一枪，随后双方换岗"],
+    proTip: "温热说明目标编号与你扫描的编号相差 1；潜行者也会猜你的推理习惯。",
+  },
+  {
+    id: "starship_defuse",
+    title: "星舰拆弹",
+    icon: "⌁✦",
+    description: "一人读取私密维修序列，一人操作控制台，合作稳定星舰。",
+    meta: "私密合作 · 3–7 分钟",
+    mode: "合作",
+    accent: "coral",
+    rules: "分析员按顺序口述私密符号，操作员在控制台输入；完成一个舱段后交换角色，错误次数耗尽或超时则任务失败。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["分析员读取只有自己能看到的符号序列", "按顺序把符号名称口述给操作员", "操作员逐枚输入，完成舱段后交换岗位"],
+    proTip: "先统一每个符号的叫法，再开始输入，能显著减少歧义。",
+  },
+  {
+    id: "quantum_duel",
+    title: "量子拳台",
+    icon: "⚡VS",
+    description: "双方同时锁定机甲招式，服务器保密并同步揭晓克制结果。",
+    meta: "同步竞争 · 2–4 分钟",
+    mode: "竞争",
+    accent: "primary",
+    rules: "突击克制蓄能、蓄能击穿防御、防御反制突击。双方秘密锁定后同时揭晓；超时未选择会把该轮分数判给已锁定的一方。",
+    optionKeys: ["pace", "length"],
+    tutorialSteps: ["从突击、防御、蓄能中暗选一招", "双方都锁定后服务器同步揭晓", "突击克蓄能、蓄能克防御、防御克突击"],
+    proTip: "连续使用同一招会形成可读习惯，偶尔反向选择能抓住对手预判。",
+  },
+  {
+    id: "starway_escort",
+    title: "星路护航",
+    icon: "🚀⬡",
+    description: "驾驶员找能量，领航员看障碍，交换情报后同步选航道与护盾。",
+    meta: "分工合作 · 3–6 分钟",
+    mode: "合作",
+    accent: "teal",
+    rules: "驾驶员只看得到能量航道，护盾领航员只看得到障碍航道。两人沟通后分别锁定路线和护盾；撞击未防护会损失船体，每航段交换角色。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["驾驶员口述能量航道，护盾员口述障碍航道", "分别锁定星舰路线与护盾覆盖", "同步揭晓结算，每航段自动交换岗位"],
+    proTip: "能量与障碍不会在同一航道；先排除危险，再决定是否追求额外能量。",
+  },
+  {
+    id: "orbital_repair",
+    title: "轨道抢修",
+    icon: "◎⚡",
+    description: "工程师旋转轨道环，发射员对照私密蓝图决定能量脉冲时机。",
+    meta: "动作合作 · 3–7 分钟",
+    mode: "合作",
+    accent: "coral",
+    rules: "发射员读取私密对接蓝图并口述目标刻度，工程师旋转轨道环；全部对齐后由发射员发射。误发会增加过载，完成一站后交换角色。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["发射员依次口述外、中、内环目标刻度", "工程师用顺/逆时针按钮移动当前接点", "全部重合后由发射员按下能量脉冲"],
+    proTip: "工程师复述完整的三个刻度再旋转，能避免中途记混环位。",
+  },
+  {
+    id: "rhythm_gravity",
+    title: "节拍引力场",
+    icon: "◀◆▶",
+    description: "听准服务器节拍同时出手，更精准的一方把能量核拉向自己。",
+    meta: "节奏竞争 · 1–3 分钟",
+    mode: "竞争",
+    accent: "primary",
+    rules: "信号亮起时双方各击拍一次，服务器比较与节拍中心的误差；更准的一方把能量核拉近一格。率先拉到己方终点，或最终更靠近自己者获胜。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["等待圆形信标从倒计时切换为“击拍”", "每轮只能按一次，输入时机对对手保密", "更接近服务器节拍者把能量核拉近一格"],
+    proTip: "追求稳定比抢按更重要；过早超过宽限会被拒绝。",
+  },
+  {
+    id: "shadow_shuttle",
+    title: "影梭追踪",
+    icon: "◉⇄",
+    description: "记住发光逃逸舱，在连续换位后找出幻影引航员。",
+    meta: "视觉追踪 · 2–5 分钟",
+    mode: "竞争",
+    accent: "coral",
+    rules: "幻影引航员秘密选择一艘逃逸舱，追踪者有 2.2 秒记忆发光目标；随后所有舱体隐藏标记并连续换位。追踪者猜中得分，猜错则幻影得分，每轮换岗。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["幻影先秘密选择一艘逃逸舱", "追踪者记住 2.2 秒内发光的目标", "标记消失后跟住连续换位并点击最终位置"],
+    proTip: "盯住目标移动方向而不是舱体颜色；所有未标记舱体看起来完全相同。",
+  },
+  {
+    id: "echo_relay",
+    title: "星语回声",
+    icon: "♫⌁",
+    description: "一人接收私密脉冲序列，一人口述复现，用声音与图形共同破译。",
+    meta: "听觉合作 · 2–5 分钟",
+    mode: "合作",
+    accent: "teal",
+    rules: "译码员按编号试听并读取私密脉冲，复现员依次输入；输错会从本段开头重来并增加干扰，每完成一段交换岗位。所有声音都有形状、颜色和文字等价线索。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["译码员按顺序试听只有自己看到的脉冲卡", "用脉冲名称、编号或音高口述给搭档", "复现员依次输入，完成一段后双方交换岗位"],
+    proTip: "先统一“低、高、长、短”等叫法；静音时直接按编号和形状沟通也能完整游玩。",
+  },
+  {
+    id: "core_rally",
+    title: "星核接力",
+    icon: "▮◆▮",
+    description: "来球方移动挡板对准轨道，在短暂窗口内弹射，和搭档轮流守住星核。",
+    meta: "动作合作 · 2–4 分钟",
+    mode: "合作",
+    accent: "primary",
+    rules: "星核会在两艘飞船间交替飞行。接球方先用上下按钮把挡板对准标记轨道，窗口亮起后按下弹射；漏接会消耗团队稳定度，完成目标次数即通关。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["来球方先看目标轨道编号", "用上下按钮把自己的挡板移动到对应轨道", "窗口亮起时按下弹射，成功后自动换搭档接球"],
+    proTip: "先完成轨道预定位，再专心等窗口；连续接力会提高分数，急着提前按反而会被服务器拒绝。",
+  },
+  {
+    id: "skyline_rescue",
+    title: "云塔救援",
+    icon: "▤≋",
+    description: "一人看热源区域，一人看所需水压，合并情报后共同稳定云端塔楼。",
+    meta: "资源合作 · 3–6 分钟",
+    mode: "合作",
+    accent: "coral",
+    rules: "高空引导员只知道热源区域，泵站员只知道匹配水压。两人先口述情报，再分别锁定云梯目标与压力；错误会损失塔体完整度并消耗水量，每波自动换岗。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["引导员口述私密的热源楼层", "泵站员口述私密的所需压力档位", "两人分别锁定楼层和水压，结算后交换岗位"],
+    proTip: "先完整复述“第几层、几档压力”再操作；乱猜最高档会快速耗尽有限储水。",
+  },
+  {
+    id: "meteor_dash",
+    title: "流星捕手",
+    icon: "✦◎",
+    description: "盯紧随机信标，在流星出现的一瞬间抢先锁定正确坐标。",
+    meta: "视觉反应 · 1–3 分钟",
+    mode: "竞争",
+    accent: "teal",
+    rules: "每轮先经历随机倒计时，流星出现后双方各有一次捕捉机会；命中优先，均命中时反应更快者得分，35 毫秒以内判为平手。率先取得不可追平优势者获胜。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["倒计时阶段不要提前触碰阵列", "流星信标亮起后立刻点击带 ✦ 的坐标", "双方作答后同步公开命中位置与服务器反应时间"],
+    proTip: "视线放在阵列中央，用余光捕捉亮点；先求点对，再逐步追求更快的反应。",
+  },
+  {
+    id: "dual_thrusters",
+    title: "双擎穿梭",
+    icon: "‹◈›",
+    description: "两人各控一侧推进器，把合力与惯性算在一起穿过连续航门。",
+    meta: "同步动作合作 · 2–4 分钟",
+    mode: "合作",
+    accent: "primary",
+    rules: "左舷玩家的档位把飞船推向较大编号轨道，右舷玩家推向较小编号轨道。双方每道航门同时秘密锁定 0/1/2 档，服务器把合力叠加到当前惯性；撞门损失船体，撑过全部航门即完成任务。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["先看飞船轨道、目标航门和当前惯性", "口头算出需要的净推力：左舷档位减右舷档位", "双方各自秘密锁定档位，揭晓后惯性会带入下一道航门"],
+    proTip: "不要只看这一格：通过航门后惯性会保留。接近边界时用反向推力提前刹车，边界本身会吸收惯性。",
+  },
+  {
+    id: "fog_sonar",
+    title: "雾海声呐",
+    icon: "◉≋",
+    description: "一人读取私密暗礁图并发出方向脉冲，一人掌舵穿过浓雾寻找信标。",
+    meta: "探索合作 · 2–5 分钟",
+    mode: "合作",
+    accent: "teal",
+    rules: "声呐领航员能看到暗礁但不能移动，雾航舵手能掌舵却看不到暗礁。用口述或有限方向脉冲规划航线；撞礁损失船体，抵达信标后交换岗位。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["声呐领航员读取只有自己能看到的暗礁图", "口述安全路线，或发送有限的上、下、左、右方向脉冲", "舵手逐格航行抵达信标；每片雾区完成后双方交换岗位"],
+    proTip: "先报出完整的两三步路线，再用方向脉冲纠错。船不会自动前进，遇到岔路时宁可停下来确认，也不要拿船体试探。",
+  },
+  {
+    id: "storm_grid",
+    title: "风暴电网",
+    icon: "⚡⌬",
+    description: "一人读取雷暴目标，一人调整节点与极性，在短暂放电窗口共同稳住电网。",
+    meta: "实时调度合作 · 2–5 分钟",
+    mode: "合作",
+    accent: "coral",
+    rules: "风暴观测员私下看到目标节点和正负极，电网调度员移动选择器并切换极性。雷暴窗口开启后，由观测员亲自放电；路由或时机错误会损失完整度，每波交换岗位。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["观测员口述私密的节点编号与正/负极", "调度员用左右按钮对准节点，并把极性切换正确", "等待脉冲窗亮起，由观测员按下放电；每波结算后交换岗位"],
+    proTip: "先校准节点，再复述一次极性。放电窗口不要求抢第一毫秒，瞄准窗口中央能拿到更高的稳定分。",
+  },
+  {
+    id: "trajectory_intercept",
+    title: "轨迹截获",
+    icon: "⇆◎",
+    description: "信号亮起后移动私密追踪器，对准公开目标并押下唯一一次截获。",
+    meta: "动作竞争 · 1–3 分钟",
+    mode: "竞争",
+    accent: "primary",
+    rules: "随机预备后目标轨道公开。双方只能看到自己的追踪器，用上、下键逐轨对准后锁定截获；正确优先，均正确时比较服务器反应时间，40ms 内判同轮平手。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["等待扫描完成；目标轨道出现前不能移动", "用上、下键移动只有自己能看到的追踪器", "确认与目标对齐后按一次截获；对方位置与时间会在结算前保密"],
+    proTip: "先数清相差几格再连续移动，别在未对准时抢按。40ms 公平阈值意味着稳定操作比赌网络延迟更重要。",
+  },
+  {
+    id: "star_trace",
+    title: "星图盲绘",
+    icon: "✦⌁",
+    description: "一人看私密星图口述路线，一人在空白星域移动光笔，把隐藏星点依次连起来。",
+    meta: "盲绘合作 · 2–5 分钟",
+    mode: "合作",
+    accent: "teal",
+    rules: "引导员能看到带顺序的私密星点，操笔员只能看到光笔与已经走过的轨迹。引导员口述上、下、左、右和步数，操笔员按顺序命中全部星点；墨量或时间耗尽则失败，每张图完成后交换岗位。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["引导员先看起点和第 1 个私密星点，报出方向与格数", "操笔员用方向键逐格移动；走错也会消耗一格星墨", "按编号依次连接所有星点，星图公开复盘后双方交换岗位"],
+    proTip: "一次只报一段，例如“向右两格、再向上一格”。操笔员每走完一段就复述当前位置，能省下比盲目修正更多的星墨。",
+  },
+  {
+    id: "magnet_haul",
+    title: "磁力搬运",
+    icon: "∩◆∩",
+    description: "两人各控一侧磁臂，保持缆索张力，协作把能量货箱送入连续装卸门。",
+    meta: "实时平衡合作 · 2–5 分钟",
+    mode: "合作",
+    accent: "coral",
+    rules: "两名玩家分别控制左、右磁臂上下移动，每步消耗共享电量。两臂距离不能超过张力上限；把两侧磁臂同时移到本关标记插槽即可通过，超时或电量耗尽则任务失败。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["先看左右两侧的目标插槽和当前磁臂位置", "各自用上、下键移动自己的磁臂；张力满格时让落后的一侧先走", "两臂同时进入目标后自动搬运货箱，并进入下一道装卸门"],
+    proTip: "目标跨度较大时不要让一侧连续跑到底。交替说“我走一格、你跟一格”，既不会触发张力保护，也最省公共电量。",
+  },
+  {
+    id: "lumen_bridge",
+    title: "光桥共振",
+    icon: "◉⌁◎",
+    description: "一人升降发射台，一人调节光束弧度；命中目标后在短暂窗口共同锁定。",
+    meta: "双控动作合作 · 2–5 分钟",
+    mode: "合作",
+    accent: "teal",
+    rules: "升降员控制光束起点高度，调制员控制星弧向上或向下弯曲，两项参数共同决定公开落点。落点命中目标后会开启服务器共振窗，两人必须各按一次锁定；错过窗口会损失稳定度，每个节点交换岗位。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["观察当前发射高度、星弧曲率与目标高度轨", "升降员移动发射台，调制员改变弧度，两人共同让落点 ✦ 与目标 ◎ 重合", "光束命中后立即各按一次共振锁定；每个节点贯通后交换控制岗位"],
+    proTip: "先报出落点与目标相差几轨。升降会整体平移光束，弧度只改变右侧落点；命中前约定“数三二一一起按”，能保住稳定度。",
+  },
+  {
+    id: "neon_dash",
+    title: "霓虹障碍赛",
+    icon: "↟▰↡",
+    description: "随机障碍亮起后同时做跳跃、滑行、闪避或急停，正确优先再比服务器反应时间。",
+    meta: "反应竞技 · 1–3 分钟",
+    mode: "竞争",
+    accent: "coral",
+    rules: "每段赛道先经过随机预备，再公开一种障碍。双方各选一次对应跑酷动作，提交内容和具体用时会保密到结算；正确动作获得通过分，两人都正确时更快者再得加速分，40ms 内按同拍处理，错误或超时会损失护盾。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["记住映射：低墙要跳跃，高架要滑行，右墙向左闪、左墙向右闪，脉冲场要急停", "等待随机预备结束；障碍出现前提交动作会被服务器拒绝", "每段只能选择一次。先保证动作正确，再争取反应加速分；错误与超时都会损失护盾"],
+    proTip: "不要只盯颜色：先读障碍名称和形状。左右封锁要求向相反方向闪避；两人反应只差 40ms 时都会按同拍通过，不必靠乱点抢延迟。",
+  },
+  {
+    id: "signal_bluff",
+    title: "星港谍报",
+    icon: "◇?",
+    description: "一人持有私密真相却可以谎报，另一人用有限扫描判断相信还是质疑。",
+    meta: "心理博弈 · 2–5 分钟",
+    mode: "竞争",
+    accent: "primary",
+    rules: "双方轮流担任发报员与审查员。发报员私下看到真实符文，可以如实发送或宣称其他符文；审查员可消耗有限扫描取得私密分组线索，再选择相信或质疑。判断正确者得分，每轮交换岗位。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["发报员读取只有自己能看到的真实符文，再公开宣称任意一个符文", "审查员观察宣称，可消耗有限扫描得知真相位于奇数档还是偶数档", "审查员选择相信或质疑；判断正确者得分，结算后双方交换岗位"],
+    proTip: "真话也可以故意表现得可疑。扫描只排除一部分符文，留到关键比分再用，往往比第一轮立刻使用更有价值。",
+  },
+  {
+    id: "prism_heist",
+    title: "光栅潜入",
+    icon: "⌁▲╳",
+    description: "一人读取私密安全航道，一人驾驶潜入舱；窗口亮起后分别旁路与冲刺。",
+    meta: "非对称动作合作 · 2–5 分钟",
+    mode: "合作",
+    accent: "teal",
+    rules: "侦察员能看到私密安全航道并口述，驾驶员移动潜入舱。光栅窗口开启后，侦察员执行旁路、驾驶员执行冲刺；两人必须各自锁定且航道正确才能无损通过，每段走廊交换岗位。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["侦察员读取只有自己能看到的安全航道编号，口述给驾驶员", "驾驶员在侦察阶段用左右按钮移动潜入舱；光栅开启后不能再换道", "突破窗口亮起时，侦察员按旁路、驾驶员按冲刺；每人只能完成自己的动作"],
+    proTip: "先把舱位移到正确航道，再约定窗口一亮同时按。侦察员不要只说“左边”，直接报“航道 02”最不容易误解。",
+  },
+  {
+    id: "nova_volley",
+    title: "星弧对攻",
+    icon: "▰✦▰",
+    description: "追逐来球轨道，在短暂击球窗选定回球落点；连拍越久，球速越快。",
+    meta: "实时对攻竞技 · 1–4 分钟",
+    mode: "竞争",
+    accent: "coral",
+    rules: "星球会沿公开轨道飞向接球方。接球方在飞行阶段左右移动自己的挡板；服务器开启击球窗后，挡板必须与来球对齐，并通过目标轨道按钮完成回击。回球落点由击球方选择，连续回击会逐拍加速；错位挥拍或窗口超时让对手得分。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["你是接球方时，用左右按钮把自己的挡板移到来球所在轨道", "击球窗变为珊瑚色后，选择一个目标轨道完成回击；这个按钮既挥拍，也决定对手下一球的位置", "观察对手挡板，把球打向离它更远的轨道；错位回击或超时都会直接失分，先达到目标分获胜"],
+    proTip: "回球前先看对手挡板。近轨保守、远轨施压；长连拍会持续提速，最后一刻才移动往往来不及。",
+  },
+  {
+    id: "pulse_pass",
+    title: "脉冲烫手",
+    icon: "›◉⚡",
+    description: "给隐藏爆点的脉冲核充能并传给对手；读懂热度，在贪心与冷却之间押注。",
+    meta: "隐藏风险竞技 · 2–5 分钟",
+    mode: "竞争",
+    accent: "teal",
+    rules: "双方轮流持有一枚不稳定脉冲核。持有者选择轻推、强传或过载，为核心增加公开电荷并立刻传给对手；精确爆点由服务器保密，达到阈值时核心会在当前持有者手中爆裂。传感器只给出稳定、升温、临界三档提示；有限的紧急冷却可降低 2 点电荷后传出。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["轮到你持有核心时，在倒计时内选择轻推、强传或过载；增加的电荷越高，对手接到的风险越大", "精确爆点不会发送给任何玩家，只能结合公开电荷、爆点范围和稳定/升温/临界提示判断", "紧急冷却会消耗整局资源、降低 2 点电荷并传出；核心在谁手中爆裂，另一方就赢下本轮"],
+    proTip: "记住双方用过的冷却次数。临界状态下的轻推并不保证安全；有时在升温阶段先逼出对手冷却，比直接过载更有价值。",
+  },
+  {
+    id: "drop_rescue",
+    title: "坠星救援",
+    icon: "◆⇣◎",
+    description: "一人抵消侧风对准着陆台，一人校准反推速度，让救援舱安全穿过大气层。",
+    meta: "双控物理合作 · 2–5 分钟",
+    mode: "合作",
+    accent: "primary",
+    rules: "领航员私下看到目标航道与侧风，用有限燃料左右侧推；制动员私下看到入场速度与唯一安全速度，调整 0–3 档反推。双方各自锁定后服务器同时计算最终航道与触地速度；偏航、硬着陆与双重偏差造成不同损伤，每次着陆交换岗位。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["领航员读取私密着陆台和侧风，算出救援舱应停在哪条预补偿航道；制动员读取私密速度，算出需要的反推档位", "两人可以反复调整自己的公开控制，但领航侧推会消耗整局燃料；确认后分别锁定，另一方无法替你操作", "服务器结算最终航道 = 当前航道 + 侧风，最终速度 = 入场速度 − 反推；两项同时命中才是柔性着陆，下一站交换岗位"],
+    proTip: "先互相报出“还差几格/几档”，再动控制。领航员要用着陆台编号减去侧风得到预补偿航道；别来回试探，燃料会贯穿整局。",
+  },
+];
+
+export const GAME_INFO = Object.fromEntries(GAMES.map((game) => [game.id, game])) as Record<GameId, GameInfo>;
+
+/** Compact option summary shown in the room. Kept pure so every game/profile can be audited. */
+export function getRoomOptionsCopy(gameId: GameId, options: GameOptions): string {
+  const pace = { relaxed: "悠闲", standard: "标准", blitz: "闪电" }[options.pace];
+  const difficulty = { easy: "轻松", standard: "标准", hard: "高手" }[options.difficulty];
+  const length = { short: "短局", standard: "标准局", long: "长局" }[options.length];
+  const labels = { pace: `${pace}节奏`, difficulty: `${difficulty}难度`, length };
+  return getConfiguredGameInfo(gameId, options).optionKeys.map((key) => labels[key]).join(" · ");
+}
+
+/** Lobby and tutorial copy must describe the configured round, not defaults. */
+export function getConfiguredGameInfo(gameId: GameId, options: GameOptions): GameInfo {
+  const game = GAME_INFO[gameId];
+  if (gameId === "gomoku") {
+    return { ...game, rules: `黑方先手，每回合 ${turnDurationForPace(options.pace) / 1000} 秒；横、竖或斜线率先连成五子获胜。` };
+  }
+  if (gameId === "split_maze") {
+    const seconds = { relaxed: 105, standard: 75, blitz: 55 }[options.pace];
+    return { ...game, rules: `在 ${seconds} 秒内到达旗帜。两人分别控制纵向和横向，每局交换控制权。` };
+  }
+  if (gameId === "sync_tap") {
+    return { ...game, rules: `倒计时结束后各按一次，共 ${roundsForLength(options.length)} 轮；服务器按两次点击的时间差计算默契分。` };
+  }
+  if (gameId === "orbital_repair") {
+    const rings = options.difficulty === "easy" ? "外、中两环" : "外、中、内三环";
+    return {
+      ...game,
+      tutorialSteps: [`发射员依次口述${rings}的目标刻度`, game.tutorialSteps[1]!, game.tutorialSteps[2]!],
+      proTip: "工程师先按环位复述所有目标刻度，再开始旋转，避免记混。",
+    };
+  }
+  if (gameId === "cover_hunt") {
+    const covers = { easy: 4, standard: 5, hard: 6 }[options.difficulty];
+    const scans = { easy: 2, standard: 1, hard: 0 }[options.difficulty];
+    return {
+      ...game,
+      rules: `本局 ${covers} 处掩体，双方轮流藏身与搜索。猎手${scans ? `每轮可扫描 ${scans} 次，再选择开一枪` : "没有扫描，直接选择掩体开一枪"}；命中猎手得分，否则潜行者得分。`,
+      tutorialSteps: [game.tutorialSteps[0]!, scans ? `猎手最多扫描 ${scans} 次，再切换“锁定一枪”` : "高手局没有扫描，猎手直接选择目标", game.tutorialSteps[2]!],
+      proTip: scans ? game.proTip : "每轮只有一枪；留意对方的藏身习惯，也别让自己的选择太容易被猜中。",
+    };
+  }
+  return game;
+}

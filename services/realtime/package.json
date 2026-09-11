@@ -1,0 +1,23 @@
+{
+  "name": "@duo/realtime",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@duo/game-core": "workspace:*",
+    "@duo/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260907.1",
+    "@types/node": "26.5.0",
+    "typescript": "~6.0.3",
+    "wrangler": "4.129.1"
+  },
+  "scripts": {
+    "dev": "wrangler dev --port 8787",
+    "typecheck": "wrangler types --check && tsc -p tsconfig.json",
+    "types": "wrangler types",
+    "deploy:dry": "wrangler deploy --dry-run",
+    "deploy": "wrangler deploy"
+  }
+}

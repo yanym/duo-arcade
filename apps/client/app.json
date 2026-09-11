@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "Tandem Arcade",
+    "slug": "tandem-arcade",
+    "version": "1.0",
+    "description": "A no-sign-up arcade for playing competitive and cooperative games with a friend or adaptive AI across Web and iPhone.",
+    "icon": "./assets/branding/app-icon.png",
+    "scheme": "duoarcade",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.duoarcade.app",
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
+    "web": {
+      "output": "single",
+      "bundler": "metro",
+      "favicon": "./assets/branding/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false,
+          "enableBackgroundRecording": false
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F7F4ED",
+          "image": "./assets/branding/splash-mark.png",
+          "imageWidth": 180,
+          "resizeMode": "contain"
+        }
+      ],
+      "expo-asset"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

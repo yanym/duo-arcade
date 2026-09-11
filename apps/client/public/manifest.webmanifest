@@ -1,0 +1,27 @@
+{
+  "name": "Tandem Arcade — Two-Player & AI Games",
+  "short_name": "Tandem Arcade",
+  "description": "No sign-up required. Invite a friend across Web and iPhone, or play instantly with adaptive AI.",
+  "lang": "en-US",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F7F4ED",
+  "theme_color": "#F7F4ED",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "/pwa-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
