@@ -77,7 +77,6 @@ Cloudflare Worker (API and static web assets)
 - `services/realtime` — Cloudflare Worker, HTTP API, hibernatable WebSockets, and room coordination.
 - `packages/game-core` — deterministic rules and AI strategies without UI or networking dependencies.
 - `packages/protocol` — shared HTTP/WebSocket types and runtime message validation.
-- `docs` — product, game, architecture, accessibility, QA, and release documentation.
 
 The client submits player intent only. Random layouts, legal actions, timers, scores, private information, and final results are owned by the room's Durable Object.
 
@@ -123,4 +122,4 @@ The realtime smoke suite creates actual rooms for all 28 games and verifies priv
 
 ## Repository status
 
-Version 1.0 is the source release in this repository. The existing production URL and stable internal identifiers remain unchanged so installed clients, room links, and iOS upgrades continue to work. Publishing a new Web deployment or App Store build is a separate release operation.
+Version 1.0 is the source and current Web release. The signed iOS build is version `1.0` (`1`) with bundle ID `com.duoarcade.app`. Stable internal identifiers remain unchanged so installed clients, room links, and future iOS upgrades continue to work.
