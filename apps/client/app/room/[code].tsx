@@ -495,10 +495,10 @@ export default function RoomScreen() {
   const stats = room ? gameStats(room.game) : [];
   const gameInfo = room ? getConfiguredGameInfo(room.gameId, room.options) : null;
   const roomDocumentTitle = !validCode
-    ? `${t("房间码不正确")} · ${t("Tandem Arcade")}`
+    ? `${t("房间码不正确")} · ${t("Duo Arcade")}`
     : roomState.status === "error"
-      ? `${t(roomState.errorCode === "room_not_found" ? "邀请已经失效" : roomState.errorCode === "protocol_mismatch" ? "需要更新应用" : "暂时无法打开房间")} · ${t("Tandem Arcade")}`
-      : `${gameInfo ? t(gameInfo.title) : t("Tandem Arcade")} · ${code}`;
+      ? `${t(roomState.errorCode === "room_not_found" ? "邀请已经失效" : roomState.errorCode === "protocol_mismatch" ? "需要更新应用" : "暂时无法打开房间")} · ${t("Duo Arcade")}`
+      : `${gameInfo ? t(gameInfo.title) : t("Duo Arcade")} · ${code}`;
   useWebDocumentTitle(roomDocumentTitle);
   const joinNickname = nickname === null
     ? localizeGeneratedNickname(roomState.identity?.nickname ?? "", settings.language)
@@ -694,8 +694,8 @@ export default function RoomScreen() {
 
   async function shareInvite() {
     try {
-      const message = t(`来 Tandem Arcade 和我玩${gameInfo?.title ?? "双人游戏"}！房间码 ${code}`);
-      const shareTitle = t("Tandem Arcade 双人邀请");
+      const message = t(`来 Duo Arcade 和我玩${gameInfo?.title ?? "双人游戏"}！房间码 ${code}`);
+      const shareTitle = t("Duo Arcade 双人邀请");
       await Share.share(
         Platform.OS === "ios"
           ? { message, url: inviteUrl }

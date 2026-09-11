@@ -1,8 +1,8 @@
-# Tandem Arcade
+# Duo Arcade
 
 **A shared game table for two — wherever you are.**
 
-Tandem Arcade is a polished, no-sign-up arcade for Web and iPhone. Create a private room, send a six-character code to a friend, and play competitive or cooperative games across devices. Prefer to play immediately? Every game also supports an adaptive AI opponent or teammate.
+Duo Arcade is a polished, no-sign-up arcade for Web and iPhone. Create a private room, send a six-character code to a friend, and play competitive or cooperative games across devices. Prefer to play immediately? Every game also supports an adaptive AI opponent or teammate.
 
 [Play the current web release](https://duo-arcade.yimgyan.workers.dev)
 

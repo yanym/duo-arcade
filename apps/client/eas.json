@@ -15,7 +15,7 @@
       }
     },
     "production": {
-      "autoIncrement": true,
+      "autoIncrement": false,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://duo-arcade.yimgyan.workers.dev",
         "EXPO_PUBLIC_WEB_URL": "https://duo-arcade.yimgyan.workers.dev"

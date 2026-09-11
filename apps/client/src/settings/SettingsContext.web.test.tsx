@@ -51,7 +51,7 @@ beforeEach(() => {
   storageValues = new Map();
   vi.stubGlobal("localStorage", storage);
   document.documentElement.lang = "zh-CN";
-  document.title = "Tandem Arcade · 好友联机与 AI 小游戏";
+  document.title = "Duo Arcade · 好友联机与 AI 小游戏";
 });
 
 afterEach(() => {
@@ -76,7 +76,7 @@ describe("web settings persistence", () => {
     });
     await waitFor(() => expect(view.result.current.ready).toBe(true));
     expect(document.documentElement.lang).toBe("en");
-    expect(document.title).toBe("Tandem Arcade · 好友联机与 AI 小游戏");
+    expect(document.title).toBe("Duo Arcade · 好友联机与 AI 小游戏");
   });
 
   it("updates the document language and persists the latest selection", async () => {
@@ -86,14 +86,14 @@ describe("web settings persistence", () => {
     act(() => view.result.current.updateSetting("language", "en"));
 
     await waitFor(() => expect(document.documentElement.lang).toBe("en"));
-    expect(document.title).toBe("Tandem Arcade · 好友联机与 AI 小游戏");
+    expect(document.title).toBe("Duo Arcade · 好友联机与 AI 小游戏");
     await waitFor(() => expect(JSON.parse(storage.getItem(SETTINGS_KEY) ?? "{}")).toMatchObject({ language: "en" }));
   });
 
   it("does not overwrite the current route title when language changes", async () => {
     const view = renderHook(() => {
       const settings = useSettings();
-      useWebDocumentTitle(settings.settings.language === "en" ? "Settings · Tandem Arcade" : "设置 · Tandem Arcade");
+      useWebDocumentTitle(settings.settings.language === "en" ? "Settings · Duo Arcade" : "设置 · Duo Arcade");
       return settings;
     }, { wrapper });
     await waitFor(() => expect(view.result.current.ready).toBe(true));
@@ -101,6 +101,6 @@ describe("web settings persistence", () => {
     act(() => view.result.current.updateSetting("language", "en"));
 
     await waitFor(() => expect(document.documentElement.lang).toBe("en"));
-    await waitFor(() => expect(document.title).toBe("Settings · Tandem Arcade"));
+    await waitFor(() => expect(document.title).toBe("Settings · Duo Arcade"));
   });
 });

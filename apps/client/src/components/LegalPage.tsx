@@ -21,7 +21,7 @@ export function LegalPage({ title, summary, sections }: {
   sections: LegalSection[];
 }) {
   const { language, t } = useI18n();
-  useWebDocumentTitle(language === "en" ? `${t(title)} · Tandem Arcade` : `${title} · Tandem Arcade`);
+  useWebDocumentTitle(language === "en" ? `${t(title)} · Duo Arcade` : `${title} · Duo Arcade`);
   return (
     <Screen>
       <View style={styles.nav}>

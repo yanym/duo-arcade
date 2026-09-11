@@ -87,7 +87,7 @@ describe("English home and solo entry", () => {
     );
 
     await waitFor(() => expect(screen.getByRole("textbox", { name: "Your game nickname" })).toBeTruthy());
-    expect(document.title).toBe("Tandem Arcade · Two-player and AI games");
+    expect(document.title).toBe("Duo Arcade · Two-player and AI games");
     expect(untranslatedFragments(view.container)).toEqual([]);
     expect(fusedEnglishFragments(view.container)).toEqual([]);
     expect(view.container.textContent).not.toMatch(/[，。：；！？、]/u);

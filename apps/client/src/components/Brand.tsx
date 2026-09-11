@@ -7,12 +7,12 @@ import { colors, radii } from "@/theme";
 export function Brand({ compact = false, iconOnly = false }: { compact?: boolean; iconOnly?: boolean }) {
   const { t } = useI18n();
   return (
-    <View accessibilityLabel={t("Tandem Arcade")} accessible style={styles.row}>
+    <View accessibilityLabel={t("Duo Arcade")} accessible style={styles.row}>
       <View style={[styles.mark, compact && styles.compactMark]}>
         <View style={[styles.dot, styles.dotLeft]} />
         <View style={[styles.dot, styles.dotRight]} />
       </View>
-      {!iconOnly && <Text style={[styles.name, compact && styles.compactName]}>Tandem Arcade</Text>}
+      {!iconOnly && <Text style={[styles.name, compact && styles.compactName]}>Duo Arcade</Text>}
     </View>
   );
 }

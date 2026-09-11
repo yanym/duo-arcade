@@ -15,7 +15,7 @@ export class AppErrorBoundary extends Component<PropsWithChildren, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    console.error("Tandem Arcade render failure", { name: error.name, componentStack: info.componentStack });
+    console.error("Duo Arcade render failure", { name: error.name, componentStack: info.componentStack });
   }
 
   private recover = (): void => {
@@ -28,7 +28,7 @@ export class AppErrorBoundary extends Component<PropsWithChildren, State> {
     return (
       <View accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.screen}>
         <View style={styles.card}>
-          <Text style={styles.kicker}>Tandem Arcade 安全兜底</Text>
+          <Text style={styles.kicker}>Duo Arcade 安全兜底</Text>
           <Text accessibilityRole="header" style={styles.title}>页面暂时没能正常显示</Text>
           <Text style={styles.body}>房间数据仍由服务器保存。返回大厅后可以用原房间码重新进入，不会因为这个页面错误改变胜负。</Text>
           <Pressable accessibilityRole="button" onPress={this.recover} style={({ pressed }) => [styles.button, pressed && styles.pressed]}>

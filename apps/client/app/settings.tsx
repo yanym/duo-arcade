@@ -77,7 +77,7 @@ export default function SettingsScreen() {
   const [resetting, setResetting] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
   const resetConfirmationRef = useRef<View>(null);
-  useWebDocumentTitle(settings.language === "en" ? "Settings · Tandem Arcade" : "设置 · Tandem Arcade");
+  useWebDocumentTitle(settings.language === "en" ? "Settings · Duo Arcade" : "设置 · Duo Arcade");
 
   useEffect(() => {
     if (!confirmingReset || Platform.OS !== "web") return;

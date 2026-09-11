@@ -11,7 +11,7 @@ import { colors, radii, shadows } from "@/theme";
 
 export default function NotFoundScreen() {
   const { t } = useI18n();
-  useWebDocumentTitle(t("页面不存在 · Tandem Arcade"));
+  useWebDocumentTitle(t("页面不存在 · Duo Arcade"));
   const { fontScale, width } = useWindowDimensions();
   const compact = width < 380 || fontScale > 1.2;
 

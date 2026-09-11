@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Tandem Arcade",
-    "slug": "tandem-arcade",
+    "name": "Duo Arcade",
+    "slug": "duo-arcade",
     "version": "1.0",
     "description": "A no-sign-up arcade for playing competitive and cooperative games with a friend or adaptive AI across Web and iPhone.",
     "icon": "./assets/branding/app-icon.png",

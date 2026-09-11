@@ -3,7 +3,7 @@ import { LegalPage, type LegalSection } from "@/components/LegalPage";
 const sections: LegalSection[] = [
   {
     title: "1. 服务内容",
-    body: "Tandem Arcade 提供无需注册的好友联机或单人 AI 小游戏、私人房间码、断线恢复和本机偏好。房间码用于便捷邀请，不等同于账户密码；请只分享给你希望加入的人。当前 1.0 版本不包含付费项目。",
+    body: "Duo Arcade 提供无需注册的好友联机或单人 AI 小游戏、私人房间码、断线恢复和本机偏好。房间码用于便捷邀请，不等同于账户密码；请只分享给你希望加入的人。当前 1.0 版本不包含付费项目。",
   },
   {
     title: "2. 公平与安全使用",
@@ -19,7 +19,7 @@ const sections: LegalSection[] = [
   },
   {
     title: "5. 知识产权",
-    body: "Tandem Arcade 的原创名称、界面、规则表达、插画、音效和代码受适用法律保护。产品借鉴的是通用互动机制，不授予任何第三方品牌、角色、素材或关卡的使用权。用户仍保有其昵称中合法内容的权利。",
+    body: "Duo Arcade 的原创名称、界面、规则表达、插画、音效和代码受适用法律保护。产品借鉴的是通用互动机制，不授予任何第三方品牌、角色、素材或关卡的使用权。用户仍保有其昵称中合法内容的权利。",
   },
   {
     title: "6. 责任边界与变更",
@@ -31,7 +31,7 @@ export default function TermsScreen() {
   return (
     <LegalPage
       sections={sections}
-      summary="使用 Tandem Arcade 即表示你同意遵守公平、安全和尊重他人的基本规则。"
+      summary="使用 Duo Arcade 即表示你同意遵守公平、安全和尊重他人的基本规则。"
       title="服务条款"
     />
   );

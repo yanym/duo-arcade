@@ -55,7 +55,7 @@ describe("English settings experience", () => {
         .map((node) => node.textContent?.trim() ?? "")
         .filter(Boolean),
     );
-    expect(document.title).toBe("Settings · Tandem Arcade");
+    expect(document.title).toBe("Settings · Duo Arcade");
     expect(visibleFragments.filter((copy) => copy !== "中文").join(" ")).not.toMatch(/[一-龥]/);
     expect(visibleFragments.join(" ")).not.toMatch(/[，。：；！？、]/u);
     for (const element of view.container.querySelectorAll("[aria-label]")) {

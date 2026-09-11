@@ -31,7 +31,7 @@ export default function PrivacyScreen() {
   return (
     <LegalPage
       sections={sections}
-      summary="这份说明用直接语言解释 Tandem Arcade 在好友联机和 AI 对局中如何处理数据，以及你可以怎样控制本机数据。"
+      summary="这份说明用直接语言解释 Duo Arcade 在好友联机和 AI 对局中如何处理数据，以及你可以怎样控制本机数据。"
       title="隐私说明"
     />
   );

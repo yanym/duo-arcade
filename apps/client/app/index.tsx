@@ -50,8 +50,8 @@ export default function HomeScreen() {
     t({ relaxed: "从容", natural: "自然", quick: "迅速" }[settings.ai.reactionSpeed]),
   ].join(" · ");
   useWebDocumentTitle(settings.language === "en"
-    ? "Tandem Arcade · Two-player and AI games"
-    : "Tandem Arcade · 好友联机与 AI 小游戏");
+    ? "Duo Arcade · Two-player and AI games"
+    : "Duo Arcade · 好友联机与 AI 小游戏");
 
   useEffect(() => {
     let cancelled = false;
@@ -408,7 +408,7 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>Tandem Arcade 1.0 · 服务端判定每一步，公平地玩</Text>
+        <Text style={styles.footerText}>Duo Arcade 1.0 · 服务端判定每一步，公平地玩</Text>
         <View style={styles.footerLinks}>
           <Pressable accessibilityRole="link" onPress={() => router.push("/privacy" as never)} style={styles.footerPressable}>
             <Text style={styles.footerLink}>隐私说明</Text>
