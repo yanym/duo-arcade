@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, useWindowDimensions, View } from "react-native";
 import { Text } from "@/components/ScaledText";
 import { useI18n } from "@/i18n";
 
@@ -40,9 +40,9 @@ const moveInfo: Record<NeonDashMove, { icon: string; label: string }> = {
   brake: { icon: "■", label: "急停" },
 };
 
-function responseCopy(response: NeonDashResponse | null): string {
-  if (!response) return "未动作";
-  return response.correct ? `${response.reactionMs} ms` : `${moveInfo[response.move].label} · 撞击`;
+function responseCopy(response: NeonDashResponse | null, t: (text: string) => string): string {
+  if (!response) return t("未动作");
+  return response.correct ? `${response.reactionMs} ms` : `${t(moveInfo[response.move].label)} · ${t("失误")}`;
 }
 
 function outcomeCopy(game: NeonDashViewState, ownSeat: Seat): string {
@@ -56,6 +56,8 @@ function outcomeCopy(game: NeonDashViewState, ownSeat: Seat): string {
 export const NeonDashGame = memo(function NeonDashGame({ game, ownSeat, phase, now, onDodge }: Props) {
   const { t } = useI18n();
   const { feedback, playSound, settings } = useSettings();
+  const { width } = useWindowDimensions();
+  const compact = width < 380;
   const signalRef = useRef("");
   const ended = Boolean(game.result) || phase === "completed";
   const paused = !ended && phase !== "playing";
@@ -92,7 +94,7 @@ export const NeonDashGame = memo(function NeonDashGame({ game, ownSeat, phase, n
   return (
     <View style={[styles.shell, settings.highContrast && styles.highContrast]}>
       <View style={styles.header}>
-        <View style={styles.headerCopy}><Text style={styles.kicker}>NEON RUN // REACTION CIRCUIT</Text><Text style={styles.title}>霓虹障碍赛</Text></View>
+        <View style={styles.headerCopy}>{!compact && <Text style={styles.kicker}>NEON RUN // REACTION CIRCUIT</Text>}<Text style={styles.title}>霓虹障碍赛</Text></View>
         <View accessibilityLabel={t(`第 ${game.round} 段赛道，共 ${game.totalRounds} 段`)} style={styles.roundBadge}><Text style={styles.roundLabel}>赛道段</Text><Text style={styles.roundValue}>{game.round}/{game.totalRounds}</Text></View>
       </View>
 
@@ -127,7 +129,7 @@ export const NeonDashGame = memo(function NeonDashGame({ game, ownSeat, phase, n
         </Text>
       </View>
 
-      <View style={[styles.track, game.phase === "reacting" && styles.trackLive]}>
+      <View style={[styles.track, compact && styles.trackCompact, game.phase === "reacting" && styles.trackLive]}>
         <View style={[styles.horizon, { pointerEvents: "none" }]}><View style={styles.sunCore} /></View>
         <View style={[styles.rail, styles.railLeft, { pointerEvents: "none" }]} />
         <View style={[styles.rail, styles.railRight, { pointerEvents: "none" }]} />
@@ -151,8 +153,8 @@ export const NeonDashGame = memo(function NeonDashGame({ game, ownSeat, phase, n
           {([0, 1] as const).map((seat) => (
             <View key={seat} style={[styles.resultCard, seat === ownSeat && styles.resultOwn]}>
               <Text style={styles.resultLabel}>{seat === ownSeat ? "你的动作" : "对手动作"}</Text>
-              <Text style={[styles.resultValue, game.responses[seat]?.correct && styles.resultCorrect]}>{responseCopy(game.responses[seat])}</Text>
-              <Text style={styles.resultMeta}>{game.responses[seat] ? `${moveInfo[game.responses[seat]!.move].icon} ${moveInfo[game.responses[seat]!.move].label} · ${game.responses[seat]!.correct ? "通过" : "失误"}` : "窗口超时 · 护盾 -1"}</Text>
+              <Text style={[styles.resultValue, game.responses[seat]?.correct && styles.resultCorrect]}>{responseCopy(game.responses[seat], t)}</Text>
+              <Text style={styles.resultMeta}>{game.responses[seat] ? `${moveInfo[game.responses[seat]!.move].icon} ${t(moveInfo[game.responses[seat]!.move].label)} · ${t(game.responses[seat]!.correct ? "通过" : "失误")}` : "窗口超时 · 护盾 -1"}</Text>
             </View>
           ))}
         </View>
@@ -203,37 +205,38 @@ const styles = createGameStyles({
   runnerBottom: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: 6, marginTop: 4 },
   lives: { color: "#67DFD2", fontSize: 8, fontWeight: "900" },
   combo: { color: "#968CB5", fontSize: 7, fontWeight: "800" },
-  status: { alignItems: "center", marginTop: 13 },
-  statusLive: { backgroundColor: "rgba(232, 80, 181, 0.08)", borderRadius: radii.small, paddingVertical: 7 },
+  status: { minHeight: 100, justifyContent: "center", alignItems: "center", marginTop: 13, paddingVertical: 7 },
+  statusLive: { backgroundColor: "rgba(232, 80, 181, 0.08)", borderRadius: radii.small },
   headline: { color: "#FFF7FF", fontSize: 17, fontWeight: "900", textAlign: "center" },
   subhead: { color: "#A49ABF", fontSize: 9, lineHeight: 14, textAlign: "center", marginTop: 3 },
-  track: { minHeight: 246, alignItems: "center", justifyContent: "center", marginTop: 10, backgroundColor: "#030515", borderRadius: radii.medium, borderWidth: 1, borderColor: "#252151", overflow: "hidden" },
+  track: { minHeight: 190, alignItems: "center", justifyContent: "center", marginTop: 10, backgroundColor: "#030515", borderRadius: radii.medium, borderWidth: 1, borderColor: "#252151", overflow: "hidden" },
+  trackCompact: { minHeight: 160 },
   trackLive: { borderColor: "#8E397D", backgroundColor: "#07051B" },
   horizon: { position: "absolute", top: 25, width: 104, height: 52, overflow: "hidden", alignItems: "center" },
   sunCore: { width: 84, height: 84, borderRadius: 42, backgroundColor: "#B33C96", borderWidth: 8, borderColor: "#412176" },
   rail: { position: "absolute", bottom: -55, width: 3, height: 330, backgroundColor: "#3E2878", transform: [{ rotate: "24deg" }] },
   railLeft: { left: "24%" },
   railRight: { right: "24%", transform: [{ rotate: "-24deg" }] },
-  scanPanel: { alignItems: "center", backgroundColor: "#11112F", borderRadius: 24, paddingHorizontal: 35, paddingVertical: 24, borderWidth: 1, borderColor: "#342C65", zIndex: 2 },
+  scanPanel: { maxWidth: "95%", alignItems: "center", backgroundColor: "#11112F", borderRadius: 24, paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1, borderColor: "#342C65", zIndex: 2 },
   scanGlyph: { color: "#9676D8", fontSize: 36, fontWeight: "300" },
   scanTitle: { color: "#E4DFFF", fontSize: 12, fontWeight: "900", marginTop: 4 },
-  scanText: { color: "#A9B3CE", fontSize: 8, fontWeight: "800", marginTop: 3 },
-  obstacle: { minWidth: 190, minHeight: 126, alignItems: "center", justifyContent: "center", backgroundColor: "#52204D", borderRadius: 26, borderWidth: 3, borderColor: "#FF83D1", zIndex: 3, shadowColor: "#FF5FC6", shadowOpacity: 0.65, shadowRadius: 18, elevation: 7 },
+  scanText: { color: "#A9B3CE", fontSize: 8, fontWeight: "800", marginTop: 3, textAlign: "center" },
+  obstacle: { width: "80%", maxWidth: 300, minHeight: 116, paddingHorizontal: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#52204D", borderRadius: 26, borderWidth: 3, borderColor: "#FF83D1", zIndex: 3, shadowColor: "#FF5FC6", shadowOpacity: 0.65, shadowRadius: 18, elevation: 7 },
   pulseObstacle: { backgroundColor: "#173C4C", borderColor: "#70E2D1", shadowColor: "#57EBD6" },
   obstacleIcon: { color: "#FFF4CC", fontSize: 43, lineHeight: 48, fontWeight: "900" },
-  obstacleName: { color: "#FFF7FF", fontSize: 12, fontWeight: "900", marginTop: 3 },
+  obstacleName: { color: "#FFF7FF", fontSize: 12, fontWeight: "900", marginTop: 3, textAlign: "center" },
   obstacleCode: { color: "#C790BC", fontSize: 7, fontWeight: "900", letterSpacing: 1, marginTop: 4 },
-  runners: { position: "absolute", bottom: 16, flexDirection: "row", gap: 48, zIndex: 4 },
-  runnerToken: { width: 38, height: 38, borderRadius: 13, alignItems: "center", justifyContent: "center", borderWidth: 2 },
+  runners: { position: "absolute", bottom: 5, flexDirection: "row", gap: 48, zIndex: 4 },
+  runnerToken: { width: 28, height: 28, borderRadius: 9, alignItems: "center", justifyContent: "center", borderWidth: 2 },
   runnerBlue: { backgroundColor: "#3E45B5", borderColor: "#969BFF" },
   runnerCoral: { backgroundColor: "#A53F67", borderColor: "#FF99B8" },
   runnerClear: { borderColor: "#73E7B0", shadowColor: "#68E6A8", shadowOpacity: 0.7, shadowRadius: 10 },
   runnerGlyph: { color: colors.surface, fontSize: 11, fontWeight: "900" },
-  actions: { flexDirection: "row", justifyContent: "center", gap: 7, marginTop: 10 },
+  actions: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 7, marginTop: 10 },
   actionButton: { flex: 1, minWidth: 44, maxWidth: 150, minHeight: 68, alignItems: "center", justifyContent: "center", backgroundColor: "#211D4A", borderRadius: radii.small, borderWidth: 1, borderColor: "#493B81" },
   actionSelected: { backgroundColor: "#614033", borderColor: "#F2D372", borderWidth: 2 },
   actionIcon: { color: "#C1B4FF", fontSize: 21, fontWeight: "900" },
-  actionLabel: { color: "#E7E0F5", fontSize: 8, fontWeight: "900", marginTop: 3 },
+  actionLabel: { color: "#E7E0F5", fontSize: 8, fontWeight: "900", marginTop: 3, textAlign: "center" },
   resultRow: { flexDirection: "row", gap: 8, marginTop: 10 },
   resultCard: { flex: 1, alignItems: "center", backgroundColor: "#17152F", borderRadius: radii.small, padding: 10, borderWidth: 1, borderColor: "#342D57" },
   resultOwn: { borderColor: "#7569DB" },
@@ -244,6 +247,6 @@ const styles = createGameStyles({
   privacyBar: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#15122D", borderRadius: radii.small, padding: 10, marginTop: 9 },
   privacyGlyph: { color: "#EF75C4", fontSize: 14, fontWeight: "900" },
   privacyText: { flex: 1, color: "#968DAA", fontSize: 8, lineHeight: 13, fontWeight: "800" },
-  disabled: { opacity: 0.33 },
+  disabled: { opacity: 0.6 },
   pressed: { transform: [{ scale: 0.92 }] },
 });

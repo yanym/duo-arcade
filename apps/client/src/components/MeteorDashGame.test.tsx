@@ -10,6 +10,22 @@ vi.mock("@/settings/SettingsContext", () => ({ useSettings: () => ({ feedback: v
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe("meteor signal feedback", () => {
+  it("reserves the same status space before, during, and after a catch without clipping text", () => {
+    const initial = createMeteorDashState(1000, 42, { ...DEFAULT_GAME_OPTIONS, difficulty: "hard" });
+    const renderState = (game: typeof initial) => <MeteorDashGame game={game} ownSeat={0} phase="playing" now={1001} onCatch={vi.fn()} />;
+    const view = render(renderState(initial));
+    for (const state of [initial,
+      { ...initial, phase: "catching" as const, targetCell: 2 },
+      { ...initial, phase: "catching" as const, targetCell: 2, locked: [true, false] as [boolean, boolean] },
+      { ...initial, phase: "round_result" as const },
+    ]) {
+      view.rerender(renderState(state));
+      const status = view.container.querySelector('[aria-live="polite"]')!.parentElement!;
+      expect(getComputedStyle(status).minHeight).toBe("80px");
+      expect(getComputedStyle(status).height).not.toBe("80px");
+      expect(screen.getAllByRole("button")).toHaveLength(8);
+    }
+  });
   it("does not put the rapidly changing countdown inside a live region", () => {
     const state = createMeteorDashState(1000, 42, DEFAULT_GAME_OPTIONS);
     render(<MeteorDashGame game={state} ownSeat={0} phase="playing" now={1001} onCatch={vi.fn()} />);

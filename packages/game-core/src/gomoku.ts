@@ -30,6 +30,7 @@ export function createGomokuState(
     currentSeat: blackSeat,
     moveCount: 0,
     lastMove: null,
+    turnDurationMs,
     turnDeadline: now + turnDurationMs,
     winningLine: null,
     result: null,
@@ -91,7 +92,7 @@ export function placeStone(
   row: number,
   col: number,
   now: number,
-  turnDurationMs = DEFAULT_TURN_DURATION_MS,
+  turnDurationMs = state.turnDurationMs ?? DEFAULT_TURN_DURATION_MS,
 ): PlaceStoneResult {
   if (state.result) return { ok: false, reason: "game_finished" };
   if (now >= state.turnDeadline) return { ok: false, reason: "turn_expired" };
@@ -133,6 +134,7 @@ export function placeStone(
       currentSeat: otherSeat(actor),
       moveCount,
       lastMove: index,
+      turnDurationMs,
       turnDeadline: now + turnDurationMs,
     },
   };

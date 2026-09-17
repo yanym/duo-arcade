@@ -32,3 +32,5 @@ export * from "./game";
 export * from "./ai-options";
 export * from "./ai-boards";
 export * from "./ai";
+export * from "./catalog";
+export * from "./ember-crew";

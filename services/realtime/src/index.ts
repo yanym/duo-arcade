@@ -1,5 +1,5 @@
-import { GAME_IDS, isGameId, normalizeAiOptions, normalizeGameOptions, type AiOptions, type GameId, type GameOptions } from "@duo/game-core";
-import { PROTOCOL_VERSION, type RoomMode } from "@duo/protocol";
+import { PLAYABLE_GAME_IDS, isPlayableGameId, isGameId, normalizeAiOptions, normalizeGameOptions, type AiOptions, type GameId, type GameOptions } from "@duo/game-core";
+import { CLIENT_PROTOCOL_HEADER, LEGACY_HTTP_PROTOCOL_VERSION, PROTOCOL_VERSION, supportsGameProtocol, type RoomMode } from "@duo/protocol";
 
 import { HttpError, isPlayerInput, normalizeNickname, readLimitedJson } from "./http";
 import type { RateLimitResult } from "./rate-limiter";
@@ -32,7 +32,7 @@ function corsHeaders(request: Request, env: Env): HeadersInit {
   }
   return {
     "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": `Content-Type, ${CLIENT_PROTOCOL_HEADER}`,
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
@@ -99,6 +99,8 @@ async function rateLimitedResponse(
 }
 
 function roomErrorStatus(code: string): number {
+  if (code === "protocol_mismatch") return 426;
+  if (code === "game_retired") return 410;
   if (code === "room_not_found") return 404;
   if (code === "room_full") return 409;
   if (code === "invalid_resume_token") return 401;
@@ -107,6 +109,8 @@ function roomErrorStatus(code: string): number {
 
 function roomErrorResponse(request: Request, env: Env, code: string, requestId: string): Response {
   const message = {
+    protocol_mismatch: "应用已有新版本，请刷新页面或重新打开应用。",
+    game_retired: "这款游戏已下架，请选择其他游戏",
     room_not_found: "这个房间不存在，或邀请已经过期",
     room_full: "这个房间已经坐满两位玩家",
     invalid_resume_token: "这台设备的房间凭证已经失效",
@@ -129,7 +133,7 @@ async function createRoom(
   for (let attempt = 0; attempt < CREATE_ROOM_ATTEMPTS; attempt += 1) {
     const code = makeRoomCode();
     const stub = env.GAME_ROOMS.getByName(code);
-    const result = await stub.createRoom(code, playerId, nickname, gameId, options, mode, aiOptions);
+    const result = await stub.createRoom(code, playerId, nickname, gameId, options, mode, aiOptions, clientProtocolVersion(request));
     if (result.ok) {
       console.log(JSON.stringify({ event: "room_created", code, attempt }));
       return json(request, env, result.value, 201);
@@ -139,6 +143,11 @@ async function createRoom(
     }
   }
   throw new HttpError(503, "code_generation_failed", "暂时无法创建房间，请重试");
+}
+
+function clientProtocolVersion(request: Request): number {
+  const advertised = request.headers.get(CLIENT_PROTOCOL_HEADER);
+  return advertised === null ? LEGACY_HTTP_PROTOCOL_VERSION : Number(advertised);
 }
 
 export default {
@@ -155,7 +164,8 @@ export default {
           service: "duo-arcade-realtime",
           release: RELEASE,
           protocol: PROTOCOL_VERSION,
-          games: GAME_IDS.length,
+          games: PLAYABLE_GAME_IDS.length,
+          gameIds: PLAYABLE_GAME_IDS,
         });
       }
 
@@ -168,6 +178,12 @@ export default {
         }
         if (!isGameId(body.gameId)) {
           throw new HttpError(400, "invalid_game", "请选择受支持的小游戏");
+        }
+        if (!isPlayableGameId(body.gameId)) {
+          throw new HttpError(410, "game_retired", "这款游戏已下架，请选择其他游戏");
+        }
+        if (!supportsGameProtocol(body.gameId, clientProtocolVersion(request))) {
+          return roomErrorResponse(request, env, "protocol_mismatch", requestId);
         }
         return await createRoom(
           request,
@@ -200,6 +216,9 @@ export default {
         const limited = await rateLimitedResponse(request, env, "preview");
         if (limited) return limited;
         const room = await stub.getRoom();
+        if (room && !supportsGameProtocol(room.gameId, clientProtocolVersion(request))) {
+          return roomErrorResponse(request, env, "protocol_mismatch", requestId);
+        }
         return room
           ? json(request, env, { room })
           : json(request, env, { error: "room_not_found" }, 404);
@@ -215,6 +234,7 @@ export default {
           body.playerId,
           normalizeNickname(body.nickname),
           body.resumeToken,
+          clientProtocolVersion(request),
         );
         if (!result.ok) {
           return roomErrorResponse(request, env, result.code, requestId);

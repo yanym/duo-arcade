@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, useWindowDimensions, View } from "react-native";
 import { Text } from "@/components/ScaledText";
 import { useI18n } from "@/i18n";
 
@@ -34,7 +34,7 @@ const runeInfo: Record<SignalRune, { glyph: string; name: string; code: string }
 };
 
 const outcomeInfo: Record<SignalBluffOutcome, string> = {
-  truth_trusted: "情报属实，审查员识破了真实讯号",
+  truth_trusted: "情报属实，审查员判断正确，获得一分",
   truth_challenged: "真实讯号被质疑，发报员反将一军",
   bluff_believed: "伪造讯号成功骗过审查员",
   bluff_exposed: "谎报被当场识破，审查员截获一分",
@@ -42,12 +42,12 @@ const outcomeInfo: Record<SignalBluffOutcome, string> = {
   judge_timeout: "审查员未按时决断，发报员获得一分",
 };
 
-function RuneBadge({ rune, muted = false, compact = false }: { rune: SignalRune; muted?: boolean; compact?: boolean }) {
+function RuneBadge({ rune, number, muted = false, compact = false }: { rune: SignalRune; number?: number; muted?: boolean; compact?: boolean }) {
   const info = runeInfo[rune];
   return (
     <View style={[styles.runeBadge, compact && styles.runeBadgeCompact, muted && styles.runeBadgeMuted]}>
       <Text style={[styles.runeBadgeGlyph, compact && styles.runeBadgeGlyphCompact]}>{info.glyph}</Text>
-      <View style={compact && styles.runeBadgeCopyCompact}><Text style={[styles.runeBadgeName, compact && styles.runeBadgeNameCompact]}>{info.name}</Text><Text style={[styles.runeBadgeCode, compact && styles.runeBadgeCodeCompact]}>{info.code}</Text></View>
+      <View style={compact && styles.runeBadgeCopyCompact}><Text style={[styles.runeBadgeName, compact && styles.runeBadgeNameCompact]}>{info.name}</Text><Text style={[styles.runeBadgeCode, compact && styles.runeBadgeCodeCompact]}>{number !== undefined ? `0${number} · ` : ""}{info.code}</Text></View>
     </View>
   );
 }
@@ -63,6 +63,8 @@ export const SignalBluffGame = memo(function SignalBluffGame({
 }: Props) {
   const { t } = useI18n();
   const { feedback, playSound, settings } = useSettings();
+  const { width } = useWindowDimensions();
+  const compact = width < 380;
   const eventRef = useRef("");
   const ended = Boolean(game.result) || phase === "completed";
   const paused = !ended && phase !== "playing";
@@ -113,7 +115,7 @@ export const SignalBluffGame = memo(function SignalBluffGame({
     <View style={[styles.shell, settings.highContrast && styles.highContrast]}>
       <View style={styles.header}>
         <View style={styles.headerCopy}>
-          <Text style={styles.kicker}>STARPORT INTELLIGENCE // ZERO-TRUST LINK</Text>
+          {!compact && <Text style={styles.kicker}>读懂对手，识破谎报</Text>}
           <Text style={styles.title}>星港谍报</Text>
         </View>
         <View style={styles.roundBadge} accessibilityLabel={t(`第 ${game.round} 轮，共 ${game.totalRounds} 轮`)}>
@@ -139,12 +141,12 @@ export const SignalBluffGame = memo(function SignalBluffGame({
         <Text style={styles.statusMeta}>{ended ? "最终比分与最后一轮真相已向双方同步" : paused ? "恢复连接后将从当前密报阶段继续" : actionExpired ? "双方操作已停止，等待服务器公开本轮结果" : game.phase === "round_result" ? "真相、宣称与裁决已向双方公开" : `服务器窗口剩余 ${seconds} 秒 · 本轮结束后交换岗位`}</Text>
       </View>
 
-      <View style={styles.console}>
+      <View style={[styles.console, compact && styles.consoleCompact]}>
         <View style={[styles.consoleGrid, { pointerEvents: "none" }]} />
         {game.phase === "claiming" ? (
           isSender && game.truthSignal ? (
-            <View accessibilityLabel={t(`仅你可见的真实讯号是${runeInfo[game.truthSignal].name}`)} style={styles.secretCard}>
-              <Text style={styles.secretEyebrow}>PRIVATE DOSSIER // 仅你可见</Text>
+            <View accessibilityLabel={t(`仅你可见的真实讯号是${runeInfo[game.truthSignal].name}`)} style={[styles.secretCard, compact && styles.secretCardCompact]}>
+              <Text style={styles.secretEyebrow}>{compact ? "仅你可见" : "PRIVATE DOSSIER // 仅你可见"}</Text>
               <Text style={styles.secretGlyph}>{runeInfo[game.truthSignal].glyph}</Text>
               <Text style={styles.secretName}>真实讯号 · {runeInfo[game.truthSignal].name}</Text>
               <Text style={styles.secretHint}>你可以如实发送，也可以宣称任何其他符文</Text>
@@ -152,20 +154,23 @@ export const SignalBluffGame = memo(function SignalBluffGame({
           ) : (
             <View style={styles.lockedCard}>
               <Text style={styles.lockedGlyph}>⌁</Text>
-              <Text style={styles.lockedTitle}>端到端密报传输中</Text>
+              <Text style={styles.lockedTitle}>等待对手公开宣称</Text>
               <Text style={styles.lockedText}>真实讯号不会发送到你的设备</Text>
             </View>
           )
         ) : game.phase === "judging" ? (
           <View style={styles.claimBoard}>
             <Text style={styles.publicLabel}>PUBLIC CLAIM // 公开宣称</Text>
-            {game.claimSignal && <RuneBadge rune={game.claimSignal} />}
+            {game.claimSignal && <RuneBadge rune={game.claimSignal} number={game.availableSignals.indexOf(game.claimSignal) + 1} />}
             {isSender && game.truthSignal ? (
               <Text style={styles.privateReminder}>你的私密真相：{runeInfo[game.truthSignal].glyph} {runeInfo[game.truthSignal].name}</Text>
             ) : game.scanHint ? (
               <View accessibilityLiveRegion="assertive" style={styles.scanResult}>
                 <Text style={styles.scanResultLabel}>你的私密频谱结果</Text>
                 <Text style={styles.scanResultValue}>{game.scanHint === "group_a" ? "奇数档" : "偶数档"} · {game.availableSignals.map((_, index) => index + 1).filter((position) => position % 2 === (game.scanHint === "group_a" ? 1 : 0)).join(" / ")}</Text>
+                <Text style={styles.scanCandidates}>{game.availableSignals
+                  .filter((_, index) => index % 2 === (game.scanHint === "group_a" ? 0 : 1))
+                  .map((signal) => `${runeInfo[signal].glyph} ${t(runeInfo[signal].name)}`).join(" / ")}</Text>
               </View>
             ) : (
               <Text style={styles.privateReminder}>{canScan ? "可消耗一次扫描，私下确认真相所在编号组" : "没有额外线索，直接作出判断"}</Text>
@@ -173,14 +178,19 @@ export const SignalBluffGame = memo(function SignalBluffGame({
           </View>
         ) : (
           <View style={styles.revealBoard}>
+            <View style={styles.revealComparison}>
             <View style={styles.revealItem}>
               <Text style={styles.revealLabel}>公开宣称</Text>
               {game.claimSignal ? <RuneBadge compact rune={game.claimSignal} muted /> : <Text style={styles.timeoutValue}>未发送</Text>}
             </View>
-            <Text style={styles.revealVs}>≠</Text>
+            <Text
+              accessibilityLabel={!game.claimSignal ? "未发送宣称" : game.claimSignal === game.truthSignal ? "宣称属实" : "宣称与真相不符"}
+              style={styles.revealVs}
+            >{!game.claimSignal ? "—" : game.claimSignal === game.truthSignal ? "=" : "≠"}</Text>
             <View style={styles.revealItem}>
               <Text style={styles.revealLabel}>真实讯号</Text>
               {game.truthSignal && <RuneBadge compact rune={game.truthSignal} />}
+            </View>
             </View>
             <View style={[styles.verdictChip, game.roundWinner === ownSeat && styles.verdictChipWon]}>
               <Text style={styles.verdictText}>{game.verdict === "trust" ? "审查员选择：相信" : game.verdict === "challenge" ? "审查员选择：质疑" : "服务器超时裁决"}</Text>
@@ -215,7 +225,7 @@ export const SignalBluffGame = memo(function SignalBluffGame({
 
       {game.phase === "judging" && (
         <View style={styles.judgePanel}>
-          {!isSender && (
+          {!isSender && (game.scanCharges[ownSeat] > 0 || game.scanned) && (
             <Pressable
               accessibilityHint={t("扫描结果只有你能看到；每局次数有限")}
               accessibilityLabel={t(`频谱扫描，剩余 ${game.scanCharges[ownSeat]} 次`)}
@@ -239,7 +249,11 @@ export const SignalBluffGame = memo(function SignalBluffGame({
         </View>
       )}
 
-      <View style={styles.privacyBar}><Text style={styles.privacyGlyph}>◈</Text><Text style={styles.privacyText}>隐私保证：真实讯号只发给当轮发报员；扫描分组只发给当轮审查员。结算前服务器不会向另一端下发秘密。</Text></View>
+      {(ended || !isSender) && <View style={styles.privacyBar}><Text style={styles.privacyGlyph}>◈</Text><Text style={styles.privacyText}>{ended
+        ? "真相、宣称与裁决已向双方公开"
+        : game.scanned && !isSender ? "扫描只缩小范围，仍需判断真假。"
+          : game.scanCharges[ownSeat] > 0 ? "你的扫描次数整局有限，留给关键判断。"
+          : "没有剩余扫描，请根据公开宣称作出判断。"}</Text></View>}
     </View>
   );
 });
@@ -266,8 +280,10 @@ const styles = createGameStyles({
   statusTitle: { color: "#FFF9EF", fontSize: 16, fontWeight: "900", textAlign: "center" },
   statusMeta: { color: "#8794AF", fontSize: 9, lineHeight: 14, textAlign: "center", marginTop: 3 },
   console: { minHeight: 232, alignItems: "center", justifyContent: "center", backgroundColor: "#070B17", borderRadius: radii.medium, borderWidth: 1, borderColor: "#263355", marginTop: 11, padding: 17, overflow: "hidden" },
+  consoleCompact: { minHeight: 180, padding: 10 },
   consoleGrid: { position: "absolute", width: "100%", height: "100%", opacity: 0.12, borderWidth: 18, borderColor: "#4DE0CD", transform: [{ rotate: "12deg" }] },
-  secretCard: { minWidth: 238, alignItems: "center", backgroundColor: "#21194A", borderRadius: 24, borderWidth: 2, borderColor: "#7A78F5", paddingHorizontal: 26, paddingVertical: 18, shadowColor: "#6B67FF", shadowOpacity: 0.4, shadowRadius: 16 },
+  secretCard: { width: "100%", maxWidth: 360, minWidth: 0, alignItems: "center", backgroundColor: "#21194A", borderRadius: 24, borderWidth: 2, borderColor: "#7A78F5", paddingHorizontal: 16, paddingVertical: 18, shadowColor: "#6B67FF", shadowOpacity: 0.4, shadowRadius: 16 },
+  secretCardCompact: { paddingVertical: 12 },
   secretEyebrow: { color: "#6FE0CD", fontSize: 7, fontWeight: "900", letterSpacing: 1 },
   secretGlyph: { color: "#F6D06B", fontSize: 52, lineHeight: 60, fontWeight: "900" },
   secretName: { color: "#FFF8ED", fontSize: 14, fontWeight: "900" },
@@ -279,7 +295,7 @@ const styles = createGameStyles({
   claimBoard: { width: "100%", alignItems: "center", gap: 10 },
   publicLabel: { color: "#F27B91", fontSize: 8, fontWeight: "900", letterSpacing: 1.05 },
   runeBadge: { width: "100%", maxWidth: 260, minWidth: 0, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 13, backgroundColor: "#262158", borderRadius: 20, borderWidth: 2, borderColor: "#8B83F7", paddingHorizontal: 22, paddingVertical: 13 },
-  runeBadgeCompact: { minWidth: 94, flexDirection: "column", gap: 2, borderRadius: 14, paddingHorizontal: 6, paddingVertical: 8 },
+  runeBadgeCompact: { minWidth: 0, flexDirection: "column", gap: 2, borderRadius: 14, paddingHorizontal: 6, paddingVertical: 8 },
   runeBadgeMuted: { backgroundColor: "#25293A", borderColor: "#5E6982" },
   runeBadgeGlyph: { color: "#F4CF72", fontSize: 36, fontWeight: "900" },
   runeBadgeGlyphCompact: { fontSize: 24 },
@@ -289,19 +305,21 @@ const styles = createGameStyles({
   runeBadgeCode: { color: "#8B97BA", fontSize: 7, fontWeight: "900", letterSpacing: 1.1, marginTop: 2 },
   runeBadgeCodeCompact: { fontSize: 5, letterSpacing: 0.7 },
   privateReminder: { color: "#8D9AB2", fontSize: 9, fontWeight: "800", textAlign: "center" },
-  scanResult: { minWidth: 210, alignItems: "center", backgroundColor: "#113B3A", borderRadius: radii.small, borderWidth: 1, borderColor: "#45CDB8", padding: 9 },
+  scanResult: { width: "100%", maxWidth: 320, minWidth: 0, alignItems: "center", backgroundColor: "#113B3A", borderRadius: radii.small, borderWidth: 1, borderColor: "#45CDB8", padding: 9 },
   scanResultLabel: { color: "#6BDFCD", fontSize: 7, fontWeight: "900" },
   scanResultValue: { color: "#E7FFF9", fontSize: 12, fontWeight: "900", marginTop: 3 },
-  revealBoard: { width: "100%", flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 10 },
-  revealItem: { flex: 1, minWidth: 98, maxWidth: 250, alignItems: "center", gap: 5 },
+  scanCandidates: { color: "#E7FFF9", fontSize: 14, lineHeight: 21, textAlign: "center", marginTop: 6 },
+  revealBoard: { width: "100%", alignItems: "center", gap: 10 },
+  revealComparison: { width: "100%", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  revealItem: { flex: 1, minWidth: 0, maxWidth: 250, alignItems: "center", gap: 5 },
   revealLabel: { color: "#7F8BA4", fontSize: 8, fontWeight: "900" },
   revealVs: { color: "#F47F93", fontSize: 22, fontWeight: "900" },
   verdictChip: { width: "100%", alignItems: "center", backgroundColor: "#331D34", borderRadius: radii.pill, padding: 8, marginTop: 2 },
   verdictChipWon: { backgroundColor: "#123B37" },
   verdictText: { color: "#F4ECF5", fontSize: 9, fontWeight: "900" },
   timeoutValue: { color: "#F08A9D", fontSize: 12, fontWeight: "900", paddingVertical: 15 },
-  runeActions: { flexDirection: "row", justifyContent: "center", gap: 7, marginTop: 10 },
-  runeButton: { flex: 1, minWidth: 50, maxWidth: 145, minHeight: 76, alignItems: "center", justifyContent: "center", backgroundColor: "#1B2341", borderRadius: radii.small, borderWidth: 1, borderColor: "#3B496F" },
+  runeActions: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 7, marginTop: 10 },
+  runeButton: { flex: 1, minWidth: 44, maxWidth: 145, minHeight: 76, alignItems: "center", justifyContent: "center", backgroundColor: "#1B2341", borderRadius: radii.small, borderWidth: 1, borderColor: "#3B496F" },
   runeIndex: { position: "absolute", top: 6, left: 7, color: "#8794B2", fontSize: 6, fontWeight: "900" },
   runeGlyph: { color: "#D9C2FF", fontSize: 25, fontWeight: "900" },
   runeName: { color: "#EAEAF5", fontSize: 8, fontWeight: "900", marginTop: 3 },

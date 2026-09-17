@@ -16,6 +16,8 @@ describe("result copy from each player's perspective", () => {
         const result = { kind: "win" as const, winnerSeat, reason };
         expect(winResultCopy(result, winnerSeat).detail.startsWith("你")).toBe(true);
         expect(winResultCopy(result, winnerSeat === 0 ? 1 : 0).detail.startsWith("对方")).toBe(true);
+        expect(winResultCopy(result, winnerSeat).title).toBe("你赢了！");
+        expect(winResultCopy(result, winnerSeat === 0 ? 1 : 0).title).toBe("对方获胜");
       });
     }
   }
@@ -24,6 +26,7 @@ describe("result copy from each player's perspective", () => {
       const result = { kind: "win" as const, winnerSeat: 0 as const, reason };
       expect(winResultCopy(result, 0).detail.startsWith("对方")).toBe(true);
       expect(winResultCopy(result, 1).detail.startsWith("你")).toBe(true);
+      expect(winResultCopy(result, 1).title).toBe("对方获胜");
     });
   }
 

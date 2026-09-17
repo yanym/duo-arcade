@@ -4,6 +4,7 @@ type WinResult = Extract<GameResult, { kind: "win" }>;
 type SuccessResult = Extract<GameResult, { kind: "success" }>;
 
 const successTitles: Record<SuccessResult["reason"], string> = {
+  ember_crew_complete: "全部居民已安全撤离！",
   exit_reached: "成功逃出迷宫！",
   rounds_complete: "同频挑战完成！",
   defuse_complete: "星舰恢复稳定！",
@@ -51,5 +52,5 @@ export function winResultCopy(result: WinResult, ownSeat: Seat): { title: string
     resigned: won ? "对方选择认输" : "你选择了认输",
     opponent_left: won ? "对方未能及时重连" : "你未能及时重连",
   };
-  return { title: won ? "你赢了！" : "这一局惜败", detail: details[result.reason] };
+  return { title: won ? "你赢了！" : "对方获胜", detail: details[result.reason] };
 }

@@ -118,7 +118,7 @@ export function CoverHuntGame({ game, ownSeat, phase, onHide, onScan, onShoot }:
             style={styles.toolButton}
             variant={tool === "scan" ? "primary" : "ghost"}
           >
-            扫描 · {game.scanCharges}
+            {`扫描 · ${game.scanCharges}`}
           </Button>
           <Button disabled={ended || paused} selected={tool === "shoot"} onPress={() => chooseTool("shoot")} style={styles.toolButton} variant={tool === "shoot" ? "primary" : "ghost"}>
             锁定一枪
@@ -135,11 +135,12 @@ export function CoverHuntGame({ game, ownSeat, phase, onHide, onScan, onShoot }:
       )}
 
       <ImageBackground
+        testID="cover-hunt-arena"
         accessibilityLabel={t("暮色外星前哨站，分布着多个可交互掩体")}
         imageStyle={styles.arenaImage}
         resizeMode="cover"
         source={require("../../assets/game-art/cover-hunt-arena-optimized.jpg")}
-        style={[styles.arena, settings.highContrast && styles.arenaHighContrast]}
+        style={[styles.arena, { height: Math.max(330, availableWidth / 1.48) }, settings.highContrast && styles.arenaHighContrast]}
       >
         <View style={styles.scrim} />
         {Array.from({ length: game.covers }, (_, index) => {
@@ -152,7 +153,8 @@ export function CoverHuntGame({ game, ownSeat, phase, onHide, onScan, onShoot }:
               accessibilityHint={canChoose && instruction ? t(instruction) : undefined}
               accessibilityLabel={t(`掩体 ${index + 1}，${coverNames[index]}`)}
               accessibilityRole="button"
-              accessibilityState={{ disabled: !canChoose }}
+              accessibilityState={{ disabled: !canChoose, selected: showsAlien }}
+              aria-pressed={showsAlien}
               disabled={!canChoose}
               key={index}
               onPress={() => chooseCover(index)}
@@ -195,12 +197,12 @@ export function CoverHuntGame({ game, ownSeat, phase, onHide, onScan, onShoot }:
 
 const styles = createGameStyles({
   shell: { width: "100%", maxWidth: 980, alignSelf: "center" },
-  scoreRow: { flexDirection: "row", alignItems: "stretch", gap: 10, marginBottom: 12 },
-  roleCard: { flex: 1, minWidth: 0, backgroundColor: colors.canvas, borderRadius: radii.medium, padding: 13, borderWidth: 1.5, borderColor: colors.faint },
+  scoreRow: { flexDirection: "row", alignItems: "stretch", gap: 8, marginBottom: 12 },
+  roleCard: { flex: 1, minWidth: 0, backgroundColor: colors.canvas, borderRadius: radii.medium, padding: 8, borderWidth: 1.5, borderColor: colors.faint },
   roleCardActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   roleKicker: { color: colors.muted, fontSize: 10, fontWeight: "900" },
   score: { color: colors.ink, fontSize: 27, fontWeight: "900", marginTop: 2 },
-  roundBadge: { minWidth: 72, alignItems: "center", justifyContent: "center", backgroundColor: colors.ink, borderRadius: radii.medium, paddingHorizontal: 12 },
+  roundBadge: { minWidth: 64, alignItems: "center", justifyContent: "center", backgroundColor: colors.ink, borderRadius: radii.medium, paddingHorizontal: 8 },
   roundLabel: { color: "#B7B8C6", fontSize: 9, fontWeight: "900" },
   round: { color: colors.surface, fontSize: 18, fontWeight: "900", marginTop: 2 },
   instructionCard: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 9, backgroundColor: "#202238", borderRadius: radii.medium, padding: 14, marginBottom: 10 },
@@ -213,7 +215,9 @@ const styles = createGameStyles({
   warmSignal: { backgroundColor: "#FFF4D6" },
   hotSignal: { backgroundColor: colors.coralSoft },
   signalText: { color: colors.ink, textAlign: "center", fontSize: 13, fontWeight: "900" },
-  arena: { width: "100%", aspectRatio: 1.48, minHeight: 330, overflow: "hidden", borderRadius: radii.large, position: "relative", ...shadows.card },
+  // Keep width constrained by the room. Yoga can enlarge an aspect-ratio view
+  // to satisfy minHeight, pushing the right-hand covers off a narrow screen.
+  arena: { width: "100%", overflow: "hidden", borderRadius: radii.large, position: "relative", ...shadows.card },
   arenaImage: { width: "100%", height: "100%", borderRadius: radii.large },
   arenaHighContrast: { borderWidth: 3, borderColor: colors.ink },
   scrim: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(16,18,46,0.08)" },

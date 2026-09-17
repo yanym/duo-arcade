@@ -1,7 +1,15 @@
-import type { AiOptions, GameAction, GameId, GameOptions, GameViewState, Seat } from "@duo/game-core";
+import type { AiOptions, EmberOperation, GameAction, GameId, GameOptions, GameViewState, Seat } from "@duo/game-core";
 
-export const PROTOCOL_VERSION = 27;
+export const PROTOCOL_VERSION = 28;
 export const COMPATIBLE_PROTOCOL_VERSIONS = [PROTOCOL_VERSION, PROTOCOL_VERSION - 1] as const;
+export const CLIENT_PROTOCOL_HEADER = "X-Duo-Protocol";
+// Version 27 clients predate HTTP capability negotiation. Keep this fixed.
+export const LEGACY_HTTP_PROTOCOL_VERSION = 27;
+
+export function supportsGameProtocol(gameId: GameId, version: number): boolean {
+  return COMPATIBLE_PROTOCOL_VERSIONS.some((candidate) => candidate === version)
+    && (gameId !== "ember_crew" || version >= 28);
+}
 
 export type RoomMode = "duo" | "ai";
 
@@ -99,6 +107,14 @@ function isSafeInteger(value: unknown): value is number {
 
 function parseGameAction(value: unknown): GameAction | null {
   if (!isRecord(value) || typeof value.kind !== "string") return null;
+  if ((value.kind === "ember_plan" || value.kind === "ember_commit") && isSafeInteger(value.round) && value.round > 0) {
+    if (value.kind === "ember_commit") return { kind: "ember_commit", round: value.round };
+    if (isSafeInteger(value.cell) && value.cell >= 0 && value.cell < 25 &&
+      (value.operation === "move" || value.operation === "extinguish" || value.operation === "refill" || value.operation === "share" || value.operation === "wait")) {
+      return { kind: "ember_plan", round: value.round, cell: value.cell, operation: value.operation as EmberOperation };
+    }
+    return null;
+  }
   if (
     (value.kind === "place_stone" || value.kind === "place_disc") &&
     isSafeInteger(value.row) &&

@@ -1,16 +1,30 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { PLAYABLE_GAME_IDS, RETIRED_GAME_IDS } from "../packages/game-core/src/catalog.ts";
 
 const apiBase = process.env.DUO_API_URL ?? "http://localhost:8787";
 const REQUEST_TIMEOUT_MS = 10_000;
 const LOCAL_ORIGIN = "http://localhost:8081";
 const UNTRUSTED_ORIGIN = "https://untrusted.example";
+let rateLimitWaits = 0;
 
 async function request(path, init = {}) {
-  return await fetch(new URL(path, apiBase), {
-    ...init,
-    signal: init.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  });
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const response = await fetch(new URL(path, apiBase), {
+      ...init,
+      signal: init.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    if (response.status !== 429 || attempt === 2) return response;
+    // Catalog coverage exceeds the normal per-minute create budget. Respect
+    // the real limiter; do not disable it or spoof a different client address.
+    const seconds = Number(response.headers.get("retry-after"));
+    assert.ok(Number.isInteger(seconds) && seconds >= 1 && seconds <= 60, "bounded Retry-After is required");
+    await response.arrayBuffer();
+    rateLimitWaits++;
+    console.log(`Rate limit observed; retrying ${path} after ${seconds}s`);
+    await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+  }
+  throw new Error("request retry budget exhausted");
 }
 
 async function expectJson(path, init, status, errorCode) {
@@ -51,6 +65,20 @@ const invalidGame = await expectJson("/api/rooms", {
   headers: { "content-type": "application/json" },
   body: JSON.stringify({ playerId: randomUUID(), nickname: "边界测试", gameId: "not_a_game" }),
 }, 400, "invalid_game");
+
+const health = await expectJson("/health", {}, 200);
+assert.equal(health.body.games, PLAYABLE_GAME_IDS.length);
+assert.deepEqual(health.body.gameIds, [...PLAYABLE_GAME_IDS]);
+assert.equal(health.body.release, "1.0");
+for (const gameId of RETIRED_GAME_IDS) {
+  for (const mode of ["duo", "ai"]) {
+    await expectJson("/api/rooms", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ playerId: randomUUID(), nickname: "Catalog check", gameId, mode }),
+    }, 410, "game_retired");
+  }
+}
 
 const unknownCode = "ZZZZZ" + String(Math.floor(Math.random() * 8) + 2);
 const missingRoom = await expectJson(`/api/rooms/${unknownCode}`, {}, 404);
@@ -129,4 +157,8 @@ console.log(JSON.stringify({
   },
   cors: { allowed: LOCAL_ORIGIN, denied: UNTRUSTED_ORIGIN },
   deepLinks: 5,
+  playableGames: health.body.games,
+  retiredGamesRejected: RETIRED_GAME_IDS.length,
+  retiredModesChecked: ["duo", "ai"],
+  rateLimitWaits,
 }));

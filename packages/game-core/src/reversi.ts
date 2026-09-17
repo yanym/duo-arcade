@@ -41,6 +41,7 @@ export function createReversiState(
     moveCount: 0,
     lastMove: null,
     passedSeat: null,
+    turnDurationMs,
     turnDeadline: now + turnDurationMs,
     result: null,
   };
@@ -106,7 +107,7 @@ export function placeDisc(
   row: number,
   col: number,
   now: number,
-  turnDurationMs = DEFAULT_TURN_DURATION_MS,
+  turnDurationMs = state.turnDurationMs ?? DEFAULT_TURN_DURATION_MS,
 ): GameActionResult {
   if (state.result) return { ok: false, reason: "game_finished" };
   if (now >= state.turnDeadline) return { ok: false, reason: "turn_expired" };
@@ -128,6 +129,7 @@ export function placeDisc(
     board,
     lastMove: index,
     moveCount: state.moveCount + 1,
+    turnDurationMs,
   };
   if (getReversiLegalMoves(base, opponent).length > 0) {
     return {

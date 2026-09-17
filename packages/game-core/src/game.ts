@@ -1,3 +1,4 @@
+import { advanceEmberCrewClock, commitEmberAction, createEmberCrewState, planEmberAction } from "./ember-crew";
 import {
   advanceCoverHuntClock,
   createCoverHuntState,
@@ -185,6 +186,7 @@ export function createGameState(
 ): GameState {
   const turnDurationMs = turnDurationForPace(options.pace);
   switch (gameId) {
+    case "ember_crew": return createEmberCrewState(now, seed, options);
     case "gomoku": return createGomokuState(startingSeat, now, turnDurationMs);
     case "reversi": return createReversiState(startingSeat, now, turnDurationMs);
     case "split_maze": {
@@ -230,6 +232,12 @@ export function applyGameAction(
   action: GameAction,
   now: number,
 ): GameActionResult {
+  if (state.kind === "ember_crew" && action.kind === "ember_plan") {
+    return planEmberAction(state, actor, action.round, action, now);
+  }
+  if (state.kind === "ember_crew" && action.kind === "ember_commit") {
+    return commitEmberAction(state, actor, action.round, now);
+  }
   if (state.kind === "gomoku" && action.kind === "place_stone") {
     return placeStone(state, actor, action.row, action.col, now);
   }
@@ -386,6 +394,7 @@ export function getGameSeatMarker(state: GameState, seat: Seat): 1 | 2 {
 }
 
 export function getGameRoleLabel(state: GameState, seat: Seat): string {
+  if (state.kind === "ember_crew") return seat === 0 ? "一号救援员" : "二号救援员";
   if (state.kind === "gomoku" || state.kind === "reversi") {
     return getSeatPiece(state, seat) === 1 ? "黑方" : "白方";
   }
@@ -469,6 +478,7 @@ export function getGameRoleLabel(state: GameState, seat: Seat): string {
 
 export function advanceGameClock<T extends GameState>(state: T, now: number): T {
   if (state.result || now < state.turnDeadline) return state;
+  if (state.kind === "ember_crew") return advanceEmberCrewClock(state, now) as T;
   if (state.kind === "cover_hunt") {
     return advanceCoverHuntClock(state, now) as T;
   }
@@ -633,7 +643,7 @@ export function shiftGameClock<T extends GameState>(state: T, nextDeadline: numb
   return { ...state, turnDeadline: nextDeadline } as T;
 }
 
-export function getGameView(state: GameState, viewerSeat: Seat | null): GameViewState {
+function getUnsanitizedGameView(state: GameState, viewerSeat: Seat | null): GameViewState {
   if (state.kind === "cover_hunt") return getCoverHuntView(state, viewerSeat);
   if (state.kind === "starship_defuse") return getDefuseView(state, viewerSeat);
   if (state.kind === "quantum_duel") return getQuantumDuelView(state, viewerSeat);
@@ -655,4 +665,11 @@ export function getGameView(state: GameState, viewerSeat: Seat | null): GameView
   if (state.kind === "pulse_pass") return getPulsePassView(state);
   if (state.kind === "drop_rescue") return getDropRescueView(state, viewerSeat);
   return state;
+}
+
+export function getGameView(state: GameState, viewerSeat: Seat | null): GameViewState {
+  const view = getUnsanitizedGameView(state, viewerSeat);
+  // A hidden answer is not private if its deterministic generator seed is public.
+  // Preserve the wire shape for installed clients, but never reveal a future-round seed.
+  return "seed" in view ? { ...view, seed: 0 } : view;
 }

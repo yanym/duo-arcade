@@ -1,3 +1,5 @@
+import type { EmberCrewState, EmberOperation } from "./ember-crew";
+
 export const GOMOKU_SIZE = 15;
 export const GOMOKU_CELL_COUNT = GOMOKU_SIZE * GOMOKU_SIZE;
 export const REVERSI_SIZE = 8;
@@ -9,7 +11,7 @@ export const SYNC_ROUNDS = 5;
 export const SYNC_COUNTDOWN_MS = 2_500;
 export const SYNC_TAP_WINDOW_MS = 8_000;
 
-export const GAME_IDS = ["gomoku", "split_maze", "reversi", "sync_tap", "cover_hunt", "starship_defuse", "quantum_duel", "starway_escort", "orbital_repair", "rhythm_gravity", "shadow_shuttle", "echo_relay", "core_rally", "skyline_rescue", "meteor_dash", "dual_thrusters", "fog_sonar", "storm_grid", "trajectory_intercept", "star_trace", "magnet_haul", "lumen_bridge", "neon_dash", "signal_bluff", "prism_heist", "nova_volley", "pulse_pass", "drop_rescue"] as const;
+export const GAME_IDS = ["gomoku", "split_maze", "reversi", "sync_tap", "cover_hunt", "starship_defuse", "quantum_duel", "starway_escort", "orbital_repair", "rhythm_gravity", "shadow_shuttle", "echo_relay", "core_rally", "skyline_rescue", "meteor_dash", "dual_thrusters", "fog_sonar", "storm_grid", "trajectory_intercept", "star_trace", "magnet_haul", "lumen_bridge", "neon_dash", "signal_bluff", "prism_heist", "nova_volley", "pulse_pass", "drop_rescue", "ember_crew"] as const;
 
 export const GAME_PACES = ["relaxed", "standard", "blitz"] as const;
 export const GAME_DIFFICULTIES = ["easy", "standard", "hard"] as const;
@@ -59,6 +61,8 @@ export type CompetitiveResult =
   | { kind: "draw"; reason: "board_full" | "board_tied" | "duel_tied" | "rhythm_tied" | "meteor_tied" | "intercept_tied" | "neon_dash_tied" | "signal_bluff_tied" | "both_left" };
 
 export type CooperativeResult =
+  | { kind: "success"; score: number; reason: "ember_crew_complete" }
+  | { kind: "failure"; score: number; reason: "building_lost" }
   | { kind: "success"; score: number; reason: "exit_reached" | "rounds_complete" | "defuse_complete" | "escort_complete" | "relay_repaired" | "echo_relay_complete" | "core_rally_complete" | "skyline_rescue_complete" | "dual_thrusters_complete" | "fog_sonar_complete" | "storm_grid_complete" | "star_trace_complete" | "magnet_haul_complete" | "lumen_bridge_complete" | "prism_heist_complete" | "drop_rescue_complete" }
   | {
       kind: "failure";
@@ -78,6 +82,8 @@ export type GomokuState = {
   moveCount: number;
   lastMove: number | null;
   turnDeadline: number;
+  /** Optional only for saved rooms created before pace was persisted. */
+  turnDurationMs?: number;
   winningLine: number[] | null;
   result: CompetitiveResult | null;
 };
@@ -93,6 +99,8 @@ export type ReversiState = {
   lastMove: number | null;
   passedSeat: Seat | null;
   turnDeadline: number;
+  /** Optional only for saved rooms created before pace was persisted. */
+  turnDurationMs?: number;
   result: CompetitiveResult | null;
 };
 
@@ -901,6 +909,7 @@ export type ShadowShuttleViewState = Omit<ShadowShuttleState, "targetPod"> & {
 };
 
 export type GameState =
+  | EmberCrewState
   | GomokuState
   | ReversiState
   | SplitMazeState
@@ -931,6 +940,7 @@ export type GameState =
   | DropRescueState;
 
 export type GameViewState =
+  | EmberCrewState
   | GomokuState
   | ReversiState
   | SplitMazeState
@@ -961,6 +971,8 @@ export type GameViewState =
   | DropRescueViewState;
 
 export type GameAction =
+  | { kind: "ember_plan"; round: number; operation: EmberOperation; cell: number }
+  | { kind: "ember_commit"; round: number }
   | { kind: "place_stone"; row: number; col: number }
   | { kind: "place_disc"; row: number; col: number }
   | { kind: "maze_move"; direction: MazeDirection }

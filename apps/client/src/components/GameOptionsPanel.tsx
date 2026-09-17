@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "@/components/ScaledText";
 import { useI18n } from "@/i18n";
 
-import type { GameOptions } from "@duo/game-core";
+import { coverHuntConfig, emberCrewConfig, type GameOptions } from "@duo/game-core";
 
 import type { GameInfo } from "@/lib/games";
 import { colors, radii } from "@/theme";
@@ -24,6 +24,10 @@ const rows: {
 ];
 
 function optionEffect(game: GameInfo, options: GameOptions): string {
+  if (game.id === "ember_crew") {
+    const config = emberCrewConfig(options);
+    return `${config.target} 位居民 · ${config.maxRounds} 轮行动 · ${config.integrity} 点楼体完整度 · 每轮 ${config.roundDurationMs / 1000} 秒规划`;
+  }
   if (game.id === "gomoku" || game.id === "reversi") {
     return `每回合 ${options.pace === "relaxed" ? 60 : options.pace === "blitz" ? 15 : 30} 秒`;
   }
@@ -38,10 +42,8 @@ function optionEffect(game: GameInfo, options: GameOptions): string {
     return `${rounds} 轮 · 每轮 ${window} 秒反应窗口`;
   }
   if (game.id === "cover_hunt") {
-    const covers = options.difficulty === "easy" ? 4 : options.difficulty === "hard" ? 6 : 5;
-    const scans = options.difficulty === "easy" ? 2 : options.difficulty === "hard" ? 0 : 1;
-    const rounds = options.length === "short" ? 3 : options.length === "long" ? 7 : 5;
-    const huntSeconds = options.pace === "relaxed" ? 30 : options.pace === "blitz" ? 12 : 20;
+    const { covers, scanCharges: scans, totalRounds: rounds, huntDurationMs } = coverHuntConfig(options);
+    const huntSeconds = huntDurationMs / 1000;
     return `${covers} 处掩体 · ${scans} 次扫描 · ${rounds} 轮 · 搜索 ${huntSeconds} 秒`;
   }
   if (game.id === "quantum_duel") {
@@ -103,7 +105,7 @@ function optionEffect(game: GameInfo, options: GameOptions): string {
     const cells = options.difficulty === "easy" ? 4 : options.difficulty === "hard" ? 8 : 6;
     const window = options.difficulty === "easy" ? 2500 : options.difficulty === "hard" ? 1200 : 1800;
     const countdown = options.pace === "relaxed" ? 2.2 : options.pace === "blitz" ? 1.1 : 1.6;
-    return `${rounds} 轮 · ${cells} 枚信标 · ${countdown} 秒随机预备 · ${window}ms 捕捉窗口`;
+    return `${rounds} 轮 · ${cells} 枚信标 · ${countdown} 秒预备 · ${window}ms 捕捉窗口`;
   }
   if (game.id === "dual_thrusters") {
     const gates = options.length === "short" ? 5 : options.length === "long" ? 9 : 7;

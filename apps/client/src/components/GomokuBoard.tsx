@@ -52,7 +52,7 @@ export const GomokuBoard = memo(function GomokuBoard({ game, phase, canPlay, onP
   }, [enabled, game, keyboardIndex]);
 
   return (
-    <View accessibilityLabel={t("15 乘 15 五子棋棋盘；按 Tab 进入棋盘，使用方向键移动，按回车或空格落子")} style={[styles.board, settings.highContrast && styles.highContrast, { width: boardSize, height: boardSize }]}>
+    <View accessibilityLabel={t(Platform.OS === "web" ? "15 乘 15 五子棋棋盘；按 Tab 进入棋盘，使用方向键移动，按回车或空格落子" : "15 乘 15 五子棋棋盘；选择空位落子")} style={[styles.board, settings.highContrast && styles.highContrast, { width: boardSize, height: boardSize }]}>
       {game.board.map((piece, index) => {
         const { row, col } = fromCellIndex(index);
         const isLast = index === game.lastMove;
@@ -60,7 +60,7 @@ export const GomokuBoard = memo(function GomokuBoard({ game, phase, canPlay, onP
         const isStar = (row === 3 || row === 7 || row === 11) && (col === 3 || col === 7 || col === 11);
         return (
           <Pressable
-            accessibilityHint={t("使用方向键移动到其他空位，按回车或空格落子")}
+            accessibilityHint={t(Platform.OS === "web" ? "使用方向键移动到其他空位，按回车或空格落子" : "轻点空位落子；使用旁白时，轻点两下确认")}
             accessibilityRole="button"
             accessibilityLabel={t(`第 ${row + 1} 行第 ${col + 1} 列，${piece === 0 ? "空位" : piece === 1 ? "黑子" : "白子"}`)}
             accessibilityState={{ disabled: !enabled || piece !== 0 }}
@@ -70,7 +70,8 @@ export const GomokuBoard = memo(function GomokuBoard({ game, phase, canPlay, onP
             onFocus={() => { setKeyboardIndex(index); setFocusedIndex(index); }}
             onPress={() => { feedback("place", "medium"); onPlace(row, col); }}
             ref={(node) => { cellRefs.current[index] = node as unknown as { focus?: () => void } | null; }}
-            style={({ pressed }) => [styles.cell, { width: cellSize, height: cellSize }, focusedIndex === index && styles.focusedCell, pressed && styles.pressedCell]}
+            // Explicit coordinates avoid Yoga wrapping a fractional-width row at 14 cells.
+            style={({ pressed }) => [styles.cell, { width: cellSize, height: cellSize, left: col * cellSize, top: row * cellSize }, focusedIndex === index && styles.focusedCell, pressed && styles.pressedCell]}
             tabIndex={enabled && piece === 0 && index === keyboardIndex ? 0 : -1}
             {...(Platform.OS === "web" ? {
               onKeyDown: (event: { nativeEvent: { key: string }; preventDefault: () => void }) => {
@@ -118,8 +119,6 @@ export const GomokuBoard = memo(function GomokuBoard({ game, phase, canPlay, onP
 const styles = createGameStyles({
   board: {
     alignSelf: "center",
-    flexDirection: "row",
-    flexWrap: "wrap",
     backgroundColor: colors.board,
     borderRadius: 18,
     overflow: "hidden",
@@ -127,7 +126,7 @@ const styles = createGameStyles({
     borderColor: "#D3A759"
   },
   highContrast: { borderColor: colors.ink },
-  cell: { alignItems: "center", justifyContent: "center" },
+  cell: { position: "absolute", alignItems: "center", justifyContent: "center" },
   focusedCell: { backgroundColor: "rgba(255,255,255,0.34)", borderWidth: 2, borderColor: colors.primaryDark },
   pressedCell: { backgroundColor: "rgba(255,255,255,0.22)" },
   horizontal: {

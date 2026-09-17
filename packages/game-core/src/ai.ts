@@ -232,6 +232,19 @@ export function chooseAiAction(
   const visible = (isCompetitiveGame(state) ? getGameView(state, seat) : state) as GameViewState;
 
   switch (visible.kind) {
+    case "ember_crew": {
+      if (visible.phase !== "planning" || visible.locked[seat]) return null;
+      const plan = chooseEmberPlan(visible, seat);
+      const previous = visible.plans[seat];
+      if (!previous || previous.operation !== plan.operation || previous.cell !== plan.cell) {
+        return { action: { kind: "ember_plan", round: visible.round, ...plan }, timing: "deliberate" };
+      }
+      // Show an independent draft early, but keep it adaptable to the human's
+      // route and revisions. Only lock after their final decision is visible.
+      return visible.locked[otherSeat(seat)]
+        ? { action: { kind: "ember_commit", round: visible.round }, timing: "deliberate" }
+        : null;
+    }
     case "gomoku": {
       const action = chooseGomokuAction(visible, seat, options, random);
       return action ? { action, timing: "deliberate" } : null;
@@ -542,3 +555,4 @@ export function suggestedMazeDirection(state: Extract<GameState, { kind: "split_
 export function signalGroup(signal: SignalRune, available: readonly SignalRune[]): "group_a" | "group_b" {
   return available.indexOf(signal) % 2 === 0 ? "group_a" : "group_b";
 }
+import { chooseEmberPlan } from "./ember-crew";

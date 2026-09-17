@@ -8,14 +8,16 @@
     "@duo/protocol": "workspace:*"
   },
   "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.1.10",
     "@cloudflare/workers-types": "5.20260907.1",
     "@types/node": "26.5.0",
     "typescript": "~6.0.3",
     "wrangler": "4.129.1"
   },
   "scripts": {
+    "test": "vitest run",
     "dev": "wrangler dev --port 8787",
-    "typecheck": "wrangler types --check && tsc -p tsconfig.json",
+    "typecheck": "wrangler types --check && tsc -p tsconfig.json && tsc -p test/tsconfig.json",
     "types": "wrangler types",
     "deploy:dry": "wrangler deploy --dry-run",
     "deploy": "wrangler deploy"

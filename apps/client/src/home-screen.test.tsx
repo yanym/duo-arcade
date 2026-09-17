@@ -94,7 +94,9 @@ describe("English home and solo entry", () => {
     expect(screen.getByRole("radiogroup", { name: "PLAY MODE" })).toBeTruthy();
     expect(screen.getByRole("radio", { name: "Play a friend. Invite a friend, then start together", checked: true })).toBeTruthy();
     const library = screen.getByRole("radiogroup", { name: "GAME LIBRARY" });
-    expect(within(library).getAllByRole("radio")).toHaveLength(28);
+    expect(within(library).getAllByRole("radio")).toHaveLength(10);
+    expect(within(library).getByRole("radio", { name: /Ember Crew/ })).toBeTruthy();
+    expect(within(library).queryByRole("radio", { name: /Split Maze|Star Trace|Fog Sonar/ })).toBeNull();
     expect(within(library).getAllByRole("radio", { checked: true })).toHaveLength(1);
 
     fireEvent.click(screen.getByRole("radio", { name: "Play with AI. AI takes the other seat immediately" }));

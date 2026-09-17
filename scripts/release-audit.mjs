@@ -3,6 +3,8 @@ import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { brotliCompressSync, constants as zlibConstants, gzipSync } from "node:zlib";
+import { GAME_IDS } from "../packages/game-core/src/types.ts";
+import { PLAYABLE_GAME_IDS, RETIRED_GAME_IDS } from "../packages/game-core/src/catalog.ts";
 
 const root = resolve(import.meta.dirname, "..");
 const clientRoot = join(root, "apps/client");
@@ -88,11 +90,26 @@ const gameCorePackage = readJson(join(root, "packages/game-core/package.json"));
 const protocolPackage = readJson(join(root, "packages/protocol/package.json"));
 const appConfig = readJson(join(clientRoot, "app.json")).expo;
 const easConfig = readJson(join(clientRoot, "eas.json"));
-const nativeInfoPath = join(clientRoot, "ios/app/Info.plist");
-const hasNativeProject = existsSync(nativeInfoPath);
-const nativeInfo = hasNativeProject ? readText(nativeInfoPath) : null;
-const nativeProject = hasNativeProject ? readText(join(clientRoot, "ios/app.xcodeproj/project.pbxproj")) : null;
-const nativePods = hasNativeProject ? readText(join(clientRoot, "ios/Podfile.lock")) : null;
+const nativeRoot = join(clientRoot, "ios");
+const hasNativeProject = existsSync(nativeRoot);
+let nativeInfo = null;
+let nativeProject = null;
+let nativePods = null;
+if (hasNativeProject) {
+  const projectDirectory = exactlyOne(
+    readdirSync(nativeRoot, { withFileTypes: true }),
+    (entry) => entry.isDirectory() && entry.name.endsWith(".xcodeproj"),
+    "native app project",
+  );
+  nativeProject = readText(join(nativeRoot, projectDirectory.name, "project.pbxproj"));
+  const infoPaths = [...nativeProject.matchAll(/INFOPLIST_FILE\s*=\s*"?([^";\n]+)"?;/g)].map((match) => match[1]);
+  assert.ok(infoPaths.length > 0, "native Info.plist setting is missing");
+  assert.equal(new Set(infoPaths).size, 1, "native build configurations use different Info.plist files");
+  const nativeInfoPath = resolve(nativeRoot, infoPaths[0]);
+  assert.ok(nativeInfoPath.startsWith(`${nativeRoot}${sep}`), "native Info.plist must belong to this project");
+  nativeInfo = readText(nativeInfoPath);
+  nativePods = readText(join(nativeRoot, "Podfile.lock"));
+}
 const routeTestFiles = walk(join(clientRoot, "app")).filter((path) => /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(path));
 assert.deepEqual(
   routeTestFiles.map((path) => relative(clientRoot, path)),
@@ -116,7 +133,9 @@ if (hasNativeProject) {
   assert.ok(nativeInfo.includes(`<string>${appConfig.scheme}</string>`), "native URL scheme is stale");
   assert.ok(nativeInfo.includes("<string>UIInterfaceOrientationPortrait</string>"), "native portrait support is missing");
   assert.ok(nativeInfo.includes("<string>Light</string>"), "native interface style is stale");
-  assert.ok(nativeProject.includes(`PRODUCT_BUNDLE_IDENTIFIER = ${appConfig.ios.bundleIdentifier};`), "native bundle id is stale");
+  const bundleIds = [...nativeProject.matchAll(/PRODUCT_BUNDLE_IDENTIFIER\s*=\s*"?([^";\n]+)"?;/g)].map((match) => match[1]);
+  assert.ok(bundleIds.length > 0, "native bundle id is missing");
+  assert.ok(bundleIds.every((bundleId) => bundleId === appConfig.ios.bundleIdentifier), "native bundle id is stale");
   assert.match(nativePods, /\bExpoAsset\b/, "native ExpoAsset pod is missing");
   assert.match(nativePods, /\bExpoAudio\b/, "native ExpoAudio pod is missing");
 }
@@ -133,15 +152,16 @@ for (const profile of ["preview", "production"]) {
 
 const protocolSource = readText(join(root, "packages/protocol/src/index.ts"));
 const serviceSource = readText(join(root, "services/realtime/src/index.ts"));
-const gameTypesSource = readText(join(root, "packages/game-core/src/types.ts"));
 const notFoundSource = readText(join(clientRoot, "app/+not-found.tsx"));
 const roomHookSource = readText(join(clientRoot, "src/hooks/useRoom.ts"));
 const roomServiceSource = readText(join(root, "services/realtime/src/room.ts"));
 const protocol = sourceNumber(protocolSource, /PROTOCOL_VERSION\s*=\s*(\d+)/, "protocol version");
 const release = sourceString(serviceSource, /const RELEASE\s*=\s*"([^"]+)"/, "release id");
-const gameIdsSource = sourceString(gameTypesSource, /GAME_IDS\s*=\s*\[([^\]]+)\]\s*as const/s, "game ids");
-const games = gameIdsSource.match(/"[a-z0-9_]+"/g)?.length ?? 0;
-assert.equal(games, 28, `existing game catalog changed unexpectedly: found ${games}`);
+const games = PLAYABLE_GAME_IDS.length;
+assert.equal(games, 10, "the curated release must contain ten playable games");
+assert.equal(RETIRED_GAME_IDS.length, 19, "the nineteen retired games must remain unavailable for new rooms");
+assert.deepEqual([...PLAYABLE_GAME_IDS, ...RETIRED_GAME_IDS].sort(), [...GAME_IDS].sort(), "saved-state compatibility and active catalog must account for every game exactly once");
+assert.match(serviceSource, /gameIds:\s*PLAYABLE_GAME_IDS/, "health must expose the actual playable catalog, not legacy identifiers");
 assert.match(notFoundSource, /这个页面不存在/);
 assert.match(notFoundSource, /router\.replace\("\/"\)/);
 assert.doesNotMatch(notFoundSource, /Sitemap|Unmatched Route/);
@@ -182,6 +202,8 @@ assert.ok(webBundleBytes.includes(releaseOrigin), "web bundle does not contain t
 assert.ok(iosBundleBytes.includes(releaseOrigin), "iOS bundle does not contain the release API origin");
 assert.ok(webBundleBytes.includes(Buffer.from("AI game settings")), "web bundle is missing English AI settings copy");
 assert.ok(iosBundleBytes.includes(Buffer.from("AI game settings")), "iOS bundle is missing English AI settings copy");
+assert.ok(webBundleBytes.includes(Buffer.from("Ember Crew")), "web export predates the curated library update");
+assert.ok(iosBundleBytes.includes(Buffer.from("Ember Crew")), "iOS export predates the curated library update");
 assert.equal(webFiles.filter((path) => path.endsWith(".wav")).length, 12, "expected 12 original audio assets");
 const webGameArt = webFiles.filter((path) => path.includes(`${sep}game-art${sep}`));
 assert.equal(webGameArt.length, 2, "expected exactly two optimized game-art assets");
@@ -202,7 +224,10 @@ assert.match(webHtml, /<html lang="en-US">/);
 assert.match(webHtml, /rel="manifest" href="\/manifest\.webmanifest"/);
 assert.match(webHtml, /\[role="radio"\]\):focus-visible/, "radio controls must retain the visible keyboard focus ring");
 assert.match(webHtml, /body\s*\{[^}]*margin:\s*0;/s, "inline reset must prevent the browser's default body-margin layout shift");
-assert.match(webHtml, /Twenty-eight competitive and cooperative games/);
+const publicHtml = readText(join(clientRoot, "public/index.html"));
+const ogDescription = sourceString(publicHtml, /property="og:description" content="([^"]+)"/, "Open Graph description");
+assert.ok(webHtml.includes(`property="og:description" content="${ogDescription}"`), "exported sharing copy is stale");
+assert.doesNotMatch(webHtml, /Twenty-eight|28 games/i, "the exported page still advertises the retired catalog");
 assert.match(webHtml, /solo play with adaptive AI/);
 assert.ok(webHtml.includes(`src="/${relative(webDist, webBundle).split(sep).join("/")}"`), "index does not reference the current web bundle");
 
@@ -213,6 +238,8 @@ const result = {
   release,
   protocol,
   games,
+  gameIds: [...PLAYABLE_GAME_IDS],
+  legacyGameIds: [...RETIRED_GAME_IDS],
   iosBuild: appConfig.ios.buildNumber,
   nativeProject: hasNativeProject ? "checked" : "managed Expo project",
   artifacts: {
@@ -236,6 +263,7 @@ if (process.env.DUO_SKIP_REMOTE !== "1") {
     "production health does not match source",
   );
   assert.equal(healthResponse.headers.get("cache-control"), "no-store");
+  assert.deepEqual(health.gameIds, [...PLAYABLE_GAME_IDS], "production exposes a different playable catalog");
 
   const homeResponse = await fetchMatchingText("/", webHtml);
   const requiredHeaders = {

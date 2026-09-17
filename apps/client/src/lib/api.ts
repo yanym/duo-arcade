@@ -1,7 +1,7 @@
 import { Platform } from "react-native";
 
 import type { AiOptions, GameId, GameOptions } from "@duo/game-core";
-import { PROTOCOL_VERSION, type RoomMode, type RoomSessionResponse, type RoomView } from "@duo/protocol";
+import { CLIENT_PROTOCOL_HEADER, PROTOCOL_VERSION, type RoomMode, type RoomSessionResponse, type RoomView } from "@duo/protocol";
 
 import type { Identity, StoredSession } from "./session";
 
@@ -24,12 +24,14 @@ export class ApiError extends Error {
 const REQUEST_TIMEOUT_MS = 12_000;
 
 const friendlyErrors: Record<string, string> = {
+  protocol_mismatch: "应用已有新版本，请刷新页面或重新打开应用。",
   room_not_found: "这个房间不存在，或邀请已经过期。",
   room_full: "这个房间已经坐满两位玩家了。",
   invalid_resume_token: "这台设备的房间凭证已经失效，请让好友重新发起邀请。",
   rate_limited: "操作有点频繁，请稍等片刻再试。",
   invalid_player: "请检查游戏昵称后再试。",
   invalid_game: "这个游戏暂时无法创建房间。",
+  game_retired: "这款游戏已从游戏库下架，请返回首页选择其他游戏。",
   code_generation_failed: "暂时没能创建房间，请再试一次。",
   internal_error: "服务暂时忙碌，请稍后重试。",
 };
@@ -62,7 +64,7 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
       signal: pending.signal,
-      headers: { "Content-Type": "application/json", ...init?.headers }
+      headers: { "Content-Type": "application/json", [CLIENT_PROTOCOL_HEADER]: String(PROTOCOL_VERSION), ...init?.headers }
     });
     const body = await response.json().catch(() => ({})) as { error?: string } & T;
     if (!response.ok) {

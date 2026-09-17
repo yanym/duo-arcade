@@ -28,7 +28,7 @@ function moveInfo(move: DuelMove | null) {
 
 function revealCopy(game: QuantumDuelViewState, ownSeat: Seat): string {
   if (game.result && game.phase !== "round_result") return "本局已结束，查看上方结果";
-  if (game.phase !== "round_result") return game.locked[ownSeat] ? "招式已加密，等待对手" : "选择招式后将立即锁定";
+  if (game.phase !== "round_result") return game.locked[ownSeat] ? "招式已锁定，等待对手" : "选择招式后将立即锁定";
   if (game.roundOutcome === "double_timeout") return "双方都未锁定，本轮无分";
   if (game.roundOutcome === "choice_timeout") return game.roundWinner === ownSeat ? "对方超时，你获得本轮" : "你未及时锁定，对方得分";
   if (game.roundWinner === null) return "同招碰撞，本轮平手";
@@ -50,7 +50,7 @@ export const QuantumDuelGame = memo(function QuantumDuelGame({ game, ownSeat, ph
   return (
     <View onLayout={(event) => setAvailableWidth(event.nativeEvent.layout.width)} style={[styles.shell, settings.highContrast && styles.highContrast]}>
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerCopy}>
           <Text style={styles.kicker}>QUANTUM ARENA</Text>
           <Text style={styles.title}>同步锁定 · 同时揭晓</Text>
         </View>
@@ -67,7 +67,7 @@ export const QuantumDuelGame = memo(function QuantumDuelGame({ game, ownSeat, ph
           <Text style={styles.fighterLabel}>你的机甲</Text>
           <Text style={styles.fighterScore}>{game.scores[ownSeat]}</Text>
           <View style={styles.choiceChip}>
-            <Text style={styles.choiceText}>{ownMove ? `${ownMove.glyph} ${ownMove.title}` : game.locked[ownSeat] ? "已锁定" : "待选择"}</Text>
+            <Text style={styles.choiceText}>{ownMove ? `${ownMove.glyph} ${t(ownMove.title)}` : game.locked[ownSeat] ? "已锁定" : "待选择"}</Text>
           </View>
         </View>
 
@@ -82,7 +82,7 @@ export const QuantumDuelGame = memo(function QuantumDuelGame({ game, ownSeat, ph
           <Text style={styles.fighterLabel}>对手机甲</Text>
           <Text style={styles.fighterScore}>{game.scores[opponentSeat]}</Text>
           <View style={styles.choiceChip}>
-            <Text style={styles.choiceText}>{opponentMove ? `${opponentMove.glyph} ${opponentMove.title}` : game.locked[opponentSeat] ? "已锁定 · 招式保密" : "思考中"}</Text>
+            <Text style={styles.choiceText}>{opponentMove ? `${opponentMove.glyph} ${t(opponentMove.title)}` : game.locked[opponentSeat] ? "已锁定 · 招式保密" : "思考中"}</Text>
           </View>
         </View>
       </View>
@@ -96,7 +96,7 @@ export const QuantumDuelGame = memo(function QuantumDuelGame({ game, ownSeat, ph
           const selected = game.choices[ownSeat] === move.id;
           return (
             <Pressable
-              accessibilityHint={t(`${move.detail}；确认后本轮不能修改`)}
+              accessibilityHint={t(`${move.detail}；点选即锁定，本轮不能修改`)}
                 accessibilityLabel={`${t(move.title)}${language === "en" ? ". " : "，"}${t(move.detail)}`}
               accessibilityRole="button"
               accessibilityState={{ disabled: !canChoose, selected }}
@@ -134,6 +134,7 @@ const styles = createGameStyles({
   shell: { width: "100%", maxWidth: 900, alignSelf: "center", backgroundColor: "#17192D", borderRadius: radii.large, padding: 18, ...shadows.card },
   highContrast: { borderWidth: 3, borderColor: colors.surface },
   header: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 14 },
+  headerCopy: { flex: 1, minWidth: 140 },
   kicker: { color: "#8EE6D4", fontSize: 9, fontWeight: "900", letterSpacing: 1.2 },
   title: { color: colors.surface, fontSize: 20, fontWeight: "900", marginTop: 3 },
   roundBadge: { minWidth: 72, backgroundColor: "#292C48", borderRadius: radii.small, alignItems: "center", padding: 9 },

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Platform } from "react-native";
 
-import type { DefuseSymbol, DuelMove, EchoTone, EscortLane, GameAction, MazeDirection, NeonDashMove, OrbitDirection, OrbitRing, PulsePower, RescuePressure, RescueZone, SignalRune, SignalVerdict, ThrusterPower } from "@duo/game-core";
+import type { DefuseSymbol, DuelMove, EchoTone, EmberPlan, EscortLane, GameAction, MazeDirection, NeonDashMove, OrbitDirection, OrbitRing, PulsePower, RescuePressure, RescueZone, SignalRune, SignalVerdict, ThrusterPower } from "@duo/game-core";
 import { PROTOCOL_VERSION, type ClientMessage, type ReactionId, type RoomSessionResponse, type RoomView, type ServerMessage } from "@duo/protocol";
 
 import { ApiError, getRoom, getServiceHealth, joinRoom, roomSocketUrl } from "@/lib/api";
@@ -22,6 +22,7 @@ export type ConnectionStatus = "loading" | "preview" | "connecting" | "connected
 export type ActionSyncStatus = "idle" | "sending" | "slow" | "confirmed";
 
 const rejectionMessages: Record<string, string> = {
+  game_retired: "这款游戏已从游戏库下架，请返回首页选择其他游戏。",
   game_finished: "本局已经结束，请查看结果或再来一局",
   not_your_turn: "还没轮到你",
   invalid_position: "这个位置不在棋盘范围内",
@@ -588,6 +589,8 @@ export function useRoom(code: string) {
     moveDropPod: (direction: -1 | 1) => performAction({ kind: "drop_move", direction }),
     adjustDropBrake: (direction: -1 | 1) => performAction({ kind: "drop_brake", direction }),
     lockDropControl: () => performAction({ kind: "drop_lock" }),
+    planEmber: (round: number, plan: EmberPlan) => performAction({ kind: "ember_plan", round, ...plan }),
+    commitEmber: (round: number) => performAction({ kind: "ember_commit", round }),
     resign: sendResign,
     voteRematch: (accept: boolean) => sendControl("rematch", accept),
     sendReaction

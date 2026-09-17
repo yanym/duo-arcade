@@ -4,7 +4,7 @@ import { Text, TextInput } from "@/components/ScaledText";
 import * as Clipboard from "expo-clipboard";
 import { router, Stack, useLocalSearchParams, useNavigation } from "expo-router";
 
-import type { GameAction, GameResult, GameViewState, Seat } from "@duo/game-core";
+import { isPlayableGameId, type GameAction, type GameResult, type GameViewState, type Seat } from "@duo/game-core";
 import type { ReactionId, RoomPhase, RoomView } from "@duo/protocol";
 
 import { Brand } from "@/components/Brand";
@@ -14,6 +14,8 @@ import { CoverHuntGame } from "@/components/CoverHuntGame";
 import { CoreRallyGame } from "@/components/CoreRallyGame";
 import { DualThrustersGame } from "@/components/DualThrustersGame";
 import { DropRescueGame } from "@/components/DropRescueGame";
+import { EmberCrewGame } from "@/components/EmberCrewGame";
+import { useNow } from "@/hooks/useNow";
 import { EchoRelayGame } from "@/components/EchoRelayGame";
 import { FogSonarGame } from "@/components/FogSonarGame";
 import { GomokuBoard } from "@/components/GomokuBoard";
@@ -45,6 +47,7 @@ import { useRoom } from "@/hooks/useRoom";
 import { useWebDocumentTitle } from "@/hooks/useWebDocumentTitle";
 import { useI18n } from "@/i18n";
 import { API_BASE_URL } from "@/lib/api";
+import { phaseHint } from "@/lib/phaseHint";
 import { getConfiguredGameInfo, getRoomOptionsCopy } from "@/lib/games";
 import { isCompetitive, isSeatActive, isTimedActionExpired } from "@/lib/playerActivity";
 import { hasSeenTutorial, markTutorialSeen } from "@/lib/tutorial";
@@ -73,24 +76,10 @@ const FAST_CLOCK_GAMES = new Set<GameViewState["kind"]>([
 ]);
 const ROOM_CODE_PATTERN = /^[2-9A-HJ-NP-Z]{6}$/;
 
-function useNow(active: boolean, intervalMs: number | null, wakeAt?: number): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!active) return;
-    if (intervalMs === null) {
-      if (wakeAt === undefined) return;
-      const timer = setTimeout(() => setNow(Date.now()), Math.max(0, wakeAt - Date.now() + 16));
-      return () => clearTimeout(timer);
-    }
-    const timer = setInterval(() => setNow(Date.now()), intervalMs);
-    return () => clearInterval(timer);
-  }, [active, intervalMs, wakeAt]);
-  return now;
-}
-
 function DeadlineTimer({ deadline, reconnecting }: { deadline: number; reconnecting: boolean }) {
   const { t } = useI18n();
-  const now = useNow(true, 500);
+  // A new deadline must refresh before paint, not reuse the previous 500ms tick.
+  const now = useNow(true, 500, deadline);
   const secondsLeft = Math.max(0, Math.ceil((deadline - now) / 1_000));
   const urgent = secondsLeft <= 8;
   return (
@@ -110,6 +99,10 @@ function phaseCopy(room: RoomView, ownSeat: Seat, now: number): string {
   }
   if (room.phase === "completed") return "本局已经结束";
   if (isTimedActionExpired(room, now)) return "时间已到，正在同步本轮结果";
+  if (room.game.kind === "ember_crew") {
+    if (room.game.phase === "round_result") return "本轮行动已完成";
+    return room.game.locked[ownSeat] ? "已确认，等待搭档" : "共同规划，分别确认";
+  }
   if (room.game.kind === "gomoku") {
     return room.game.currentSeat === ownSeat ? "轮到你落子" : room.mode === "ai" ? "AI 对手正在落子" : "等待对手落子";
   }
@@ -200,7 +193,9 @@ function phaseCopy(room: RoomView, ownSeat: Seat, now: number): string {
   }
   if (room.game.kind === "pulse_pass") {
     if (room.game.phase === "round_result") return room.game.roundWinner === ownSeat ? "核心在对手手中爆裂，你赢下本轮" : "爆点已经揭晓，准备下一轮";
-    return ownSeat === room.game.holderSeat ? "核心在你手中：充能传出或消耗冷却" : "观察公开热度，准备接过核心";
+    return ownSeat === room.game.holderSeat
+      ? room.game.ventCharges[ownSeat] > 0 ? "核心在你手中：充能传出或消耗冷却" : "核心在你手中：选择充能强度"
+      : "观察公开热度，准备接过核心";
   }
   if (room.game.kind === "drop_rescue") {
     if (room.game.phase === "landing_result") return room.game.lastOutcome === "soft_landing" ? "柔性着陆完成，准备交换岗位" : "着陆遥测已公开，检查偏差";
@@ -241,43 +236,6 @@ function phaseCopy(room: RoomView, ownSeat: Seat, now: number): string {
   return room.game.roundOutcome === "hit" ? "猎手命中目标" : "潜行者守住了这一轮";
 }
 
-function phaseHint(room: RoomView, ownSeat: Seat): string {
-  if (room.phase === "reconnect_grace") return "等待好友回来；倒计时结束后本局会自动结算";
-  if (room.phase === "completed") {
-    if (room.mode === "ai") return "查看结果，或立即和 AI 再来一局";
-    if (room.rematchVotes.includes(ownSeat)) return "你的重赛意愿已同步，正在等待对方回应";
-    if (room.rematchVotes.includes(ownSeat === 0 ? 1 : 0)) return "对方已经同意重赛，现在轮到你决定";
-    return "看看结果，或者两人同意再来一局";
-  }
-  if (room.game.kind === "gomoku") return "率先横、竖或斜线连成五子即可获胜";
-  if (room.game.kind === "reversi") return "夹住对方棋子来翻面，无棋可下会自动跳过";
-  if (room.game.kind === "split_maze") return "你们分别控制纵向与横向，撞墙会计数";
-  if (room.game.kind === "sync_tap") return `两人都按下后进入下一轮，共进行 ${room.game.totalRounds} 轮`;
-  if (room.game.kind === "starship_defuse") return "答案只发给分析员；每完成一个舱段就交换角色";
-  if (room.game.kind === "echo_relay") return "序列只发给译码员；声音都有名称、形状和编号等价线索，每段完成后换岗";
-  if (room.game.kind === "core_rally") return "接球方独立控制自己的挡板；对准轨道并在服务器窗口内弹射，每拍自动换边";
-  if (room.game.kind === "skyline_rescue") return "引导员只知道热源区域，泵站员只知道所需水压；口头合并情报后各自操作，每波换岗";
-  if (room.game.kind === "meteor_dash") return "每轮只有一次选择；双方作答前，对手的坐标和反应时间都保持保密";
-  if (room.game.kind === "dual_thrusters") return "左舷推向较大编号、右舷推向较小编号；档位与当前惯性相加，双方选择在结算前保密";
-  if (room.game.kind === "fog_sonar") return "暗礁只向声呐领航员显示；舵手可接收公开方向脉冲，每片雾区完成后双方交换岗位";
-  if (room.game.kind === "storm_grid") return "目标节点与极性只向观测员显示；调度员负责路由，观测员在服务器放电窗口内触发，每波交换岗位";
-  if (room.game.kind === "trajectory_intercept") return "目标轨道会同时公开；双方只能看到自己的追踪器，位置与反应时间在本轮结算前保密，40ms 内判同轮平手";
-  if (room.game.kind === "star_trace") return "星点路径只向引导员显示；操笔员看见自己的光笔和已走轨迹，每移动一格都会消耗星墨，完成一图后交换岗位";
-  if (room.game.kind === "magnet_haul") return "两侧位置与目标公开；每人只能移动自己的磁臂，张力达到上限时必须让落后的一侧先跟上，每步消耗公共电量";
-  if (room.game.kind === "lumen_bridge") return "一人控制发射台高度，另一人控制光束弧度；命中目标后两人必须在短暂服务器共振窗内各锁定一次，每个节点交换岗位";
-  if (room.game.kind === "neon_dash") return "低墙跳跃、高架滑行、右墙左闪、左墙右闪、脉冲场急停；正确优先，同为正确时反应差 40ms 内按同拍结算";
-  if (room.game.kind === "signal_bluff") return "真相只向发报员显示，扫描分组只向审查员显示；相信真话或质疑谎报都能得分，每轮自动换岗";
-  if (room.game.kind === "prism_heist") return "安全航道只向侦察员显示；驾驶员先换道，窗口开启后两人分别旁路和冲刺，每段交换岗位";
-  if (room.game.kind === "nova_volley") return "只有接球方能移动挡板；对准公开来球后，在服务器击球窗内选择回球轨道。连拍逐步加速，错位或超时直接失分";
-  if (room.game.kind === "pulse_pass") return "精确爆点对双方保密；持有者选择充能档位后立刻传出，达到阈值或持有超时都会让对手得分。冷却次数贯穿整局";
-  if (room.game.kind === "drop_rescue") return "航道与侧风只向领航员显示，速度与安全值只向制动员显示；两项控制分别锁定后由服务器结算，每个救援点交换岗位";
-  if (room.game.kind === "quantum_duel") return "突击克蓄能、蓄能克防御、防御克突击；双方选择互相保密";
-  if (room.game.kind === "starway_escort") return "驾驶员和护盾员各自只看一半情报，每航段交换角色";
-  if (room.game.kind === "orbital_repair") return "目标刻度只发给发射员；工程师完成旋转后由发射员确认发射";
-  if (room.game.kind === "rhythm_gravity") return "每轮只按一次；对方击拍的具体时机要到双方完成后才会公开";
-  if (room.game.kind === "shadow_shuttle") return "记忆阶段后所有舱体会隐藏标记；换位由服务器逐步驱动并在两端同步";
-  return "藏身点只会发送给潜行者；猎手的扫描结果也保持私密";
-}
 
 function resultCopy(result: GameResult, ownSeat: Seat): { title: string; detail: string } {
   if (result.kind === "draw") {
@@ -304,6 +262,7 @@ function resultCopy(result: GameResult, ownSeat: Seat): { title: string; detail:
   if (result.kind === "failure") {
     const detail = {
       timeout: "时间用完了，再配合一次一定会更好",
+      building_lost: "楼体已无法支撑，下一次分工控制火势并优先撤离居民",
       too_many_strikes: "错误次数已用完，重新分工再试一次",
       hull_lost: "船体完整度归零，下一次先保护关键航线",
       reactor_overload: "误发次数耗尽导致反应堆过载，重新校准后再试一次",
@@ -360,6 +319,7 @@ function gameActionLabel(room: RoomView): string {
 }
 
 function gameStats(game: GameViewState): { label: string; value: string }[] {
+  if (game.kind === "ember_crew") return [{ label: "居民撤离", value: `${game.rescued}/${game.target}` }, { label: "楼体完整度", value: `${game.integrity}/${game.maxIntegrity}` }, { label: "完成轮次", value: String(Math.max(0, game.round - (game.phase === "planning" ? 1 : 0))) }];
   if (game.kind === "gomoku") return [{ label: "总手数", value: String(game.moveCount) }];
   if (game.kind === "reversi") {
     return [
@@ -458,6 +418,7 @@ export default function RoomScreen() {
   const { feedback, settings } = useSettings();
   const { t } = useI18n();
   const roomScreenRef = useRef<ScrollView | null>(null);
+  const [gameTop, setGameTop] = useState(0);
   const playedResultRef = useRef<string | null>(null);
   const allowNavigationRef = useRef(false);
   const tutorialCheckedRef = useRef<string | null>(null);
@@ -475,6 +436,8 @@ export default function RoomScreen() {
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const ownSeat = roomState.session?.seat ?? 0;
   const room = roomState.room;
+  const retiredGame = Boolean(room && !isPlayableGameId(room.gameId));
+  const showRetiredNotice = retiredGame && (!roomState.session || room?.phase === "waiting" || room?.phase === "ready");
   const stackedForLargeText = width < 520 && fontScale > 1.2;
   const needsGameClock = Boolean(room && room.phase === "playing");
   const needsFastClock = Boolean(needsGameClock && room && FAST_CLOCK_GAMES.has(room.game.kind));
@@ -544,7 +507,7 @@ export default function RoomScreen() {
   }, [feedback, room?.phase]);
 
   useEffect(() => {
-    if (!room || !roomState.session || room.phase !== "ready" || !room.players.every(Boolean)) return;
+    if (!room || !isPlayableGameId(room.gameId) || !roomState.session || room.phase !== "ready" || !room.players.every(Boolean)) return;
     if (tutorialCheckedRef.current === room.gameId) return;
     tutorialCheckedRef.current = room.gameId;
     void hasSeenTutorial(room.gameId).then((seen) => {
@@ -632,10 +595,10 @@ export default function RoomScreen() {
     if (roomState.status === "connecting") return "正在连接";
     if (roomState.status === "loading") return "正在打开";
     if (roomState.status === "error") return "连接失败";
-    return roomIsFull ? "房间已满" : "邀请有效";
-  }, [roomIsFull, roomState.actionSyncStatus, roomState.status]);
+    return retiredGame ? "游戏已下架" : roomIsFull ? "房间已满" : "邀请有效";
+  }, [retiredGame, roomIsFull, roomState.actionSyncStatus, roomState.status]);
 
-  const roomHeaderTitle = room?.phase === "waiting"
+  const roomHeaderTitle = showRetiredNotice ? "游戏已下架" : room?.phase === "waiting"
     ? "等待好友"
     : room?.phase === "ready"
       ? partnerDisconnected
@@ -718,6 +681,9 @@ export default function RoomScreen() {
     roomState.join(joinNickname);
   }
 
+  const focusGameBoard = room?.game.kind === "neon_dash" || room?.game.kind === "meteor_dash" || room?.game.kind === "nova_volley" || room?.game.kind === "signal_bluff" || room?.game.kind === "cover_hunt" || room?.game.kind === "quantum_duel";
+  const compactGameShell = focusGameBoard || room?.game.kind === "ember_crew" || room?.game.kind === "pulse_pass";
+
   if (!ROOM_CODE_PATTERN.test(code)) {
     return (
       <Screen>
@@ -731,7 +697,8 @@ export default function RoomScreen() {
   }
 
   return (
-    <Screen scrollRef={roomScreenRef} scrollResetKey={room?.phase ?? null}>
+    <Screen scrollRef={roomScreenRef} scrollResetKey={room?.phase ?? null}
+      scrollResetOffset={width < 600 && focusGameBoard && room?.phase === "playing" ? gameTop : 0}>
       <Stack.Screen options={{ gestureEnabled: room?.phase !== "playing" && room?.phase !== "reconnect_grace", title: `${t(gameInfo?.title ?? "双人游戏")} · ${code}` }} />
       <View style={styles.nav}>
         <Brand compact iconOnly={width < 440 || fontScale > 1.2} />
@@ -795,7 +762,15 @@ export default function RoomScreen() {
         </View>
       )}
 
-      {room && !roomState.session && roomIsFull && (
+      {showRetiredNotice && (
+        <View accessibilityLiveRegion="polite" style={styles.centerCard}>
+          <Text accessibilityRole="header" aria-level={2} style={styles.resultTitle}>这款游戏已下架</Text>
+          <Text style={styles.muted}>这款游戏不再接受新玩家或开新局。回到首页，选一款新的游戏一起玩。</Text>
+          <Button onPress={requestLeave}>选择其他游戏</Button>
+        </View>
+      )}
+
+      {room && !retiredGame && !roomState.session && roomIsFull && (
         <View accessibilityLiveRegion="polite" style={styles.centerCard}>
           <Text accessibilityRole="header" aria-level={2} style={styles.resultTitle}>这桌已经坐满了</Text>
           <Text style={styles.muted}>邀请仍然有效，但两位玩家都已经入席。如果你已经在玩，请回到原来的浏览器标签页；否则请让好友结束后重新开房。</Text>
@@ -803,7 +778,7 @@ export default function RoomScreen() {
         </View>
       )}
 
-      {room && !roomState.session && !roomIsFull && (
+      {room && !retiredGame && !roomState.session && !roomIsFull && (
         <View style={styles.joinCard}>
           <View style={styles.joinIcon}><Text style={styles.joinIconText}>{gameInfo?.icon}</Text></View>
           <Text accessibilityRole="header" aria-level={2} style={styles.resultTitle}>好友在等你</Text>
@@ -841,7 +816,7 @@ export default function RoomScreen() {
 
       {room && roomState.session && (
         <>
-          <View style={[styles.players, (width < 380 || stackedForLargeText) && styles.playersCompact]}>
+          {(room.game.kind !== "ember_crew" || room.phase === "waiting" || room.phase === "ready" || room.phase === "completed") && <View style={[styles.players, (width < 380 || stackedForLargeText) && styles.playersCompact]}>
             <PlayerPill
               actionLabel={gameActionLabel(room)}
               active={seat0Active}
@@ -861,9 +836,9 @@ export default function RoomScreen() {
               showActionLabel={showExclusiveAction && width >= 430}
               showReady={room.phase === "waiting" || room.phase === "ready"}
             />
-          </View>
+          </View>}
 
-          {(room.phase === "waiting" || room.phase === "ready") && (
+          {!retiredGame && (room.phase === "waiting" || room.phase === "ready") && (
             <View style={[styles.lobbyCard, width < 720 && styles.lobbyCardStacked]}>
               <View style={[styles.lobbyCopy, width < 720 && styles.lobbyCopyStacked]}>
                 <Text accessibilityLiveRegion="polite" accessibilityRole="header" aria-level={2} style={styles.lobbyTitle}>{lobbyTitle}</Text>
@@ -916,13 +891,13 @@ export default function RoomScreen() {
           )}
 
           {(room.phase === "playing" || room.phase === "reconnect_grace" || room.phase === "completed") && (
-            <View style={styles.gameShell}>
+            <View onLayout={({ nativeEvent }) => setGameTop(nativeEvent.layout.y)} style={[styles.gameShell, compactGameShell && styles.emberShell]}>
               {!result && (
               <View style={[styles.gameStatusRow, stackedForLargeText && styles.gameStatusRowLargeText]}>
-                <View accessibilityLiveRegion="polite" style={styles.statusCopy}>
+                {!compactGameShell && <View accessibilityLiveRegion="polite" style={styles.statusCopy}>
                   <Text accessibilityRole="header" aria-level={2} style={styles.phaseLabel}>{roomState.status === "error" ? "连接恢复后继续" : roomState.status === "reconnecting" || roomState.status === "connecting" ? "正在恢复对局连接" : phaseCopy(room, ownSeat, now)}</Text>
                   <Text style={styles.phaseHint}>{roomState.status !== "connected" ? "操作已暂停；恢复后会自动同步最新进度" : phaseHint(room, ownSeat)}</Text>
-                </View>
+                </View>}
                 <View style={[styles.statusTools, stackedForLargeText && styles.statusToolsLargeText]}>
                   {roomState.actionSyncStatus !== "idle" && (
                     <View
@@ -945,7 +920,7 @@ export default function RoomScreen() {
               </View>
               )}
 
-              {!result && room.ai && (room.ai.status === "thinking" || aiIntent || aiSuggestion) && (
+              {!result && room.game.kind !== "ember_crew" && room.ai && (room.ai.status === "thinking" || aiIntent || aiSuggestion) && (
                 <View accessibilityLiveRegion="polite" style={styles.aiAssistCard}>
                   <View style={[styles.aiAssistDot, room.ai.status === "thinking" && styles.aiAssistDotThinking]} />
                   <View style={styles.aiAssistCopy}>
@@ -970,8 +945,8 @@ export default function RoomScreen() {
               )}
 
               {result && (
-                <View accessibilityLiveRegion="assertive" style={styles.resultCard}>
-                  <View style={styles.resultCopy}>
+                <View accessibilityLiveRegion="assertive" style={[styles.resultCard, (width < 600 || fontScale > 1.2) && styles.resultCardStacked]}>
+                  <View style={[styles.resultCopy, (width < 600 || fontScale > 1.2) && styles.resultCopyStacked]}>
                     <Text accessibilityRole="header" aria-level={2} style={styles.resultTitle}>{result.title}</Text>
                     <Text style={styles.muted}>{result.detail}</Text>
                     <View style={styles.resultStats}>
@@ -984,7 +959,10 @@ export default function RoomScreen() {
                     </View>
                   </View>
                   <View style={styles.resultActions}>
-                  <Button
+                  {retiredGame ? <>
+                    <Text style={styles.muted}>本局结果已保留，请回首页选择其他游戏。</Text>
+                    <Button onPress={requestLeave}>选择其他游戏</Button>
+                  </> : <Button
                     disabled={roomState.status !== "connected"}
                     loading={roomState.controlPending === "rematch"}
                     loadingLabel={room.rematchVotes.includes(ownSeat) ? "正在取消" : "正在确认"}
@@ -999,9 +977,9 @@ export default function RoomScreen() {
                       : room.rematchVotes.includes(ownSeat === 0 ? 1 : 0)
                         ? "对方已同意，轮到你"
                         : "再来一局"}
-                  </Button>
+                  </Button>}
                   <Button onPress={() => setTutorialOpen(true)} style={styles.guideButton} variant="ghost">玩法</Button>
-                  {room.rematchVotes.length > 0 && <Text accessibilityLiveRegion="polite" style={styles.resultNextHint}>{phaseHint(room, ownSeat)}</Text>}
+                  {!retiredGame && room.rematchVotes.length > 0 && <Text accessibilityLiveRegion="polite" style={styles.resultNextHint}>{phaseHint(room, ownSeat)}</Text>}
                   </View>
                 </View>
               )}
@@ -1242,6 +1220,15 @@ export default function RoomScreen() {
                   phase={gameInteractionPhase}
                 />
               )}
+              {room.game.kind === "ember_crew" && (
+                <EmberCrewGame key={`${room.round}:${room.game.round}`} game={room.game} now={now}
+                  playerNames={[room.players[0]?.nickname ?? "", room.players[1]?.nickname ?? ""]}
+                  playerConnected={[Boolean(room.players[0]?.connected), Boolean(room.players[1]?.connected)]}
+                  partnerIsAi={Boolean(room.players[ownSeat === 0 ? 1 : 0]?.isAi)}
+                  ownSeat={ownSeat} phase={gameInteractionPhase} pending={roomState.actionPending}
+                  onPlan={(plan) => { if (room.game.kind === "ember_crew") roomState.planEmber(room.game.round, plan); }}
+                  onCommit={() => { if (room.game.kind === "ember_crew") roomState.commitEmber(room.game.round); }} />
+              )}
               {room.game.kind === "lumen_bridge" && (
                 <LumenBridgeGame
                   game={room.game}
@@ -1363,6 +1350,7 @@ const styles = StyleSheet.create({
   waitingIndicator: { marginBottom: 10 },
   readyLabel: { color: colors.ink, fontSize: 13, fontWeight: "800", marginBottom: 10, textAlign: "center" },
   gameShell: { position: "relative", backgroundColor: colors.surface, borderRadius: radii.large, padding: 18, ...shadows.card },
+  emberShell: { padding: 8 },
   gameStatusRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12, paddingHorizontal: 4, marginBottom: 16 },
   aiAssistCard: { minHeight: 58, flexDirection: "row", alignItems: "center", gap: 11, marginBottom: 16, paddingHorizontal: 14, paddingVertical: 11, borderRadius: radii.medium, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.primarySoft },
   aiAssistDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.teal },
@@ -1398,6 +1386,8 @@ const styles = StyleSheet.create({
   reactionLarge: { fontSize: 30 },
   resultCard: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 18, marginBottom: 18, backgroundColor: colors.primarySoft, borderRadius: radii.medium, padding: 18 },
   resultCopy: { flexGrow: 1, flexShrink: 1, flexBasis: 210, minWidth: 0 },
+  resultCardStacked: { flexDirection: "column", alignItems: "stretch" },
+  resultCopyStacked: { flexBasis: "auto", width: "100%" },
   resultActions: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8, maxWidth: "100%" },
   resultNextHint: { flexBasis: "100%", color: colors.muted, fontSize: 12, lineHeight: 18 },
   resultStats: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 10 },

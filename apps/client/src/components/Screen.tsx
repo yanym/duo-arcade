@@ -8,17 +8,18 @@ import { colors } from "@/theme";
 type ScreenProps = PropsWithChildren<{
   scrollRef?: RefObject<ScrollView | null>;
   scrollResetKey?: string | number | null;
+  scrollResetOffset?: number;
 }>;
 
-export function Screen({ children, scrollRef, scrollResetKey }: ScreenProps) {
+export function Screen({ children, scrollRef, scrollResetKey, scrollResetOffset = 0 }: ScreenProps) {
   const internalScrollRef = useRef<ScrollView | null>(null);
   const activeScrollRef = scrollRef ?? internalScrollRef;
   const pathname = usePathname();
 
   useLayoutEffect(() => {
     const resetScroll = () => {
-      activeScrollRef.current?.scrollTo({ animated: false, y: 0 });
-      if (Platform.OS === "web" && typeof globalThis.scrollTo === "function") globalThis.scrollTo({ top: 0 });
+      activeScrollRef.current?.scrollTo({ animated: false, y: scrollResetOffset });
+      if (Platform.OS === "web" && typeof globalThis.scrollTo === "function") globalThis.scrollTo({ top: scrollResetOffset });
     };
     resetScroll();
     const frame = requestAnimationFrame(resetScroll);
@@ -29,7 +30,7 @@ export function Screen({ children, scrollRef, scrollResetKey }: ScreenProps) {
       clearTimeout(earlyTimer);
       clearTimeout(focusRecoveryTimer);
     };
-  }, [activeScrollRef, pathname, scrollResetKey]);
+  }, [activeScrollRef, pathname, scrollResetKey, scrollResetOffset]);
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom", "left", "right"]}>

@@ -33,7 +33,24 @@ describe("signal bluff", () => {
     expect([easy.totalRounds, easy.signalCount, easy.scanCharges, easy.claimDurationMs, easy.judgeDurationMs])
       .toEqual([9, 3, [2, 2], 30_000, 20_000]);
     expect([hard.totalRounds, hard.signalCount, hard.scanCharges, hard.claimDurationMs, hard.judgeDurationMs])
-      .toEqual([7, 5, [0, 0], 12_000, 9_000]);
+      .toEqual([7, 5, [1, 1], 12_000, 9_000]);
+  });
+
+  it("keeps one strategic scan in expert play without replenishing it on role swaps", () => {
+    let state = createSignalBluffState(0, 1000, 42, { ...options, difficulty: "hard" });
+    state = unwrap(claimSignal(state, 0, state.truthSignal, 1001));
+    state = unwrap(scanSignal(state, 1, 1002));
+    expect(getSignalBluffView(state, 0).scanHint).toBeNull();
+    expect(getSignalBluffView(state, 1).scanHint).not.toBeNull();
+    expect(getSignalBluffView(state, 1).truthSignal).toBeNull();
+    state = unwrap(judgeSignal(state, 1, "trust", 1003));
+    state = advanceSignalBluffClock(state, state.turnDeadline);
+    state = unwrap(claimSignal(state, 1, state.truthSignal, state.turnDeadline - 2));
+    state = unwrap(judgeSignal(state, 0, "trust", state.turnDeadline - 1));
+    state = advanceSignalBluffClock(JSON.parse(JSON.stringify(state)), state.turnDeadline);
+    expect(state.scanCharges).toEqual([1, 0]);
+    state = unwrap(claimSignal(state, 0, state.truthSignal, state.turnDeadline - 2));
+    expect(scanSignal(state, 1, state.turnDeadline - 1)).toEqual({ ok: false, reason: "no_scans_left" });
   });
 
   it("reveals the truth only to the current sender", () => {

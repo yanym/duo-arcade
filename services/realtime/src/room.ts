@@ -15,12 +15,14 @@ import {
   getGameSeatMarker,
   getGameView,
   isCompetitiveGame,
+  isPlayableGameId,
   normalizeAiOptions,
   normalizeGameOptions,
   otherSeat,
   resignGame,
   shiftGameClock,
   suggestedAiTeamAction,
+  turnDurationForPace,
   updateAiMemory,
   type AiOptions,
   type GameId,
@@ -29,6 +31,8 @@ import {
 } from "@duo/game-core";
 import {
   COMPATIBLE_PROTOCOL_VERSIONS,
+  LEGACY_HTTP_PROTOCOL_VERSION,
+  supportsGameProtocol,
   parseClientMessage,
   type PlayerView,
   type RoomMode,
@@ -89,7 +93,10 @@ export class GameRoom extends DurableObject<Env> {
     options: GameOptions = DEFAULT_GAME_OPTIONS,
     mode: RoomMode = "duo",
     aiOptions: AiOptions = DEFAULT_AI_OPTIONS,
+    clientProtocol = LEGACY_HTTP_PROTOCOL_VERSION,
   ): Promise<RoomRpcResult<RoomSessionResponse>> {
+    if (!isPlayableGameId(gameId)) return { ok: false, code: "game_retired" };
+    if (!supportsGameProtocol(gameId, clientProtocol)) return { ok: false, code: "protocol_mismatch" };
     if (this.readRoom()) {
       return { ok: false, code: "room_exists" };
     }
@@ -176,6 +183,7 @@ export class GameRoom extends DurableObject<Env> {
     playerId: string,
     nickname: string,
     resumeToken?: string,
+    clientProtocol = LEGACY_HTTP_PROTOCOL_VERSION,
   ): Promise<RoomRpcResult<RoomSessionResponse>> {
     const rotatedToken = randomToken();
     const rotatedTokenHash = await hashToken(rotatedToken);
@@ -189,6 +197,8 @@ export class GameRoom extends DurableObject<Env> {
       return { ok: false, code: "room_not_found" };
     }
 
+    // Reject before rotating credentials or occupying a seat an old client cannot render.
+    if (!supportsGameProtocol(room.gameId, clientProtocol)) return { ok: false, code: "protocol_mismatch" };
     const existing = room.players.find((player) => player?.id === playerId) ?? null;
     if (existing) {
       if (!resumeTokenHash || !secureHashEqual(existing.tokenHash, resumeTokenHash)) {
@@ -214,6 +224,9 @@ export class GameRoom extends DurableObject<Env> {
         },
       };
     }
+
+    // Existing players may recover a saved match, but retirement closes admission.
+    if (!isPlayableGameId(room.gameId)) return { ok: false, code: "game_retired" };
 
     const openSeat = room.players[0] ? (room.players[1] ? null : 1) : 0;
     if (openSeat === null) {
@@ -283,6 +296,9 @@ export class GameRoom extends DurableObject<Env> {
     if (!room || !player) {
       return new Response("Invalid room credentials", { status: 401 });
     }
+    if (!supportsGameProtocol(room.gameId, Number(selectedProtocol.slice("duo-v".length)))) {
+      return new Response("Update the app to play this game", { status: 426 });
+    }
 
     const pair = new WebSocketPair();
     const client = pair[0];
@@ -351,6 +367,10 @@ export class GameRoom extends DurableObject<Env> {
     }
 
     if (input.type === "set_ready") {
+      if (!isPlayableGameId(room.gameId)) {
+        this.reject(ws, "game_retired", room.version);
+        return;
+      }
       if (room.phase !== "waiting" && room.phase !== "ready") {
         this.reject(ws, "room_not_ready", room.version);
         return;
@@ -482,6 +502,14 @@ export class GameRoom extends DurableObject<Env> {
         input.expectedVersion === room.version - 1 &&
         room.game.phase === "descent" &&
         !room.game.locked[attachment.seat];
+      const acceptsConcurrentEmberAction =
+        room.game.kind === "ember_crew" &&
+        (input.payload.kind === "ember_plan" || input.payload.kind === "ember_commit") &&
+        input.payload.round === room.game.round &&
+        input.expectedVersion === room.version - 1 &&
+        room.game.phase === "planning" &&
+        room.game.lastActorSeat === otherSeat(attachment.seat) &&
+        !room.game.locked[attachment.seat];
       if (
         input.expectedVersion !== room.version &&
         !acceptsConcurrentMazeMove &&
@@ -497,7 +525,8 @@ export class GameRoom extends DurableObject<Env> {
         !acceptsConcurrentBridgeAction &&
         !acceptsConcurrentNeonDodge &&
         !acceptsConcurrentHeistLock &&
-        !acceptsConcurrentDropAction
+        !acceptsConcurrentDropAction &&
+        !acceptsConcurrentEmberAction
       ) {
         this.reject(ws, input.actionId, "stale_version", room.version);
         return;
@@ -554,6 +583,10 @@ export class GameRoom extends DurableObject<Env> {
     }
 
     if (input.type === "rematch_vote") {
+      if (!isPlayableGameId(room.gameId)) {
+        this.reject(ws, "game_retired", room.version);
+        return;
+      }
       if (room.phase !== "completed") {
         this.reject(ws, "game_not_completed", room.version);
         return;
@@ -696,6 +729,11 @@ export class GameRoom extends DurableObject<Env> {
       if (player) player.isAi ??= false;
     }
     room.options = normalizeGameOptions(room.options ?? DEFAULT_GAME_OPTIONS);
+    if (room.game.kind === "gomoku" || room.game.kind === "reversi") {
+      // Restore the next-turn budget of old saved matches without changing the
+      // current deadline or the remaining time preserved during a disconnect.
+      room.game.turnDurationMs ??= turnDurationForPace(room.options.pace);
+    }
     room.expiresAt ??= room.updatedAt + (
       room.phase === "completed" ? COMPLETED_ROOM_TTL_MS : WAITING_ROOM_TTL_MS
     );
@@ -810,7 +848,7 @@ export class GameRoom extends DurableObject<Env> {
     if (player.disconnectedAt === null) {
       if (room.phase === "waiting" || room.phase === "ready") {
         const now = Date.now();
-        if (room.players.every((candidate) => candidate?.ready) && this.allPlayersConnected(room)) {
+        if (isPlayableGameId(room.gameId) && room.players.every((candidate) => candidate?.ready) && this.allPlayersConnected(room)) {
           room.phase = "playing";
           room.game = createGameState(
             room.gameId,

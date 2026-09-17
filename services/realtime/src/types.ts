@@ -42,6 +42,8 @@ export type StoredRoom = {
 };
 
 export type RoomRpcErrorCode =
+  | "protocol_mismatch"
+  | "game_retired"
   | "room_exists"
   | "room_not_found"
   | "room_full"

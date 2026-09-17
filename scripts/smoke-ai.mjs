@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { PROTOCOL_VERSION } from "../packages/protocol/src/index.ts";
+import { CLIENT_PROTOCOL_HEADER, PROTOCOL_VERSION } from "../packages/protocol/src/index.ts";
+import { chooseEmberPlan } from "../packages/game-core/src/ember-crew.ts";
+import { requiredMoveForObstacle } from "../packages/game-core/src/neon-dash.ts";
 
 const apiBase = process.env.DUO_API_URL ?? "http://localhost:8787";
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -9,7 +11,7 @@ async function json(path, init = {}) {
   const response = await fetch(`${apiBase}${path}`, {
     ...init,
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    headers: { "content-type": "application/json", ...init.headers },
+    headers: { "content-type": "application/json", [CLIENT_PROTOCOL_HEADER]: String(PROTOCOL_VERSION), ...init.headers },
   });
   const body = await response.json();
   return { body, response };
@@ -62,13 +64,14 @@ function sendAction(socket, room, payload) {
   }));
 }
 
-async function createAiRoom(gameId) {
+async function createAiRoom(gameId, options) {
   const identity = { playerId: randomUUID(), nickname: "AI 回归测试" };
   const { body, response } = await json("/api/rooms", {
     method: "POST",
     body: JSON.stringify({
       ...identity,
       gameId,
+      options,
       mode: "ai",
       aiOptions: { difficulty: "hard", intelligence: "strategic", reactionSpeed: "quick" },
     }),
@@ -128,60 +131,63 @@ const resumed = await json(`/api/rooms/${gomoku.room.code}/join`, {
 });
 assert.equal(resumed.response.status, 200, JSON.stringify(resumed.body));
 socket = await openSocket(gomoku.room.code, resumed.body);
-room = await waitForRoom(socket, (candidate) => candidate.phase === "playing", "AI room resume");
+const resumeSnapshot = waitForRoom(socket, (candidate) => candidate.phase === "playing", "AI room resume");
+socket.send(JSON.stringify({ type: "request_snapshot" }));
+room = await resumeSnapshot;
 assert.equal(room.players[1].connected, true);
 socket.close(1000, "smoke_complete");
 
-const defuse = await createAiRoom("starship_defuse");
-const defuseSocket = await openSocket(defuse.room.code, defuse);
-const defuseStart = waitForRoom(defuseSocket, (candidate) => candidate.phase === "playing", "AI teammate start");
-defuseSocket.send(JSON.stringify({ type: "set_ready", ready: true }));
-const defuseRoom = await defuseStart;
-if (defuseRoom.game.operatorSeat === defuse.seat) {
-  assert.equal(defuseRoom.ai.suggestion?.kind, "defuse_press", "AI analyst did not communicate the next symbol");
-  assert.equal(defuseRoom.ai.intent, null);
-} else {
-  assert.equal(defuseRoom.ai.intent?.kind, "defuse_press", "AI operator did not schedule its own input");
+// Retired instruction-relay games must not be recreated just to keep an old
+// smoke suite green. Saved-room compatibility is covered by runtime fixtures.
+const rescue = await createAiRoom("ember_crew", { pace: "relaxed", difficulty: "standard", length: "short" });
+const rescueSocket = await openSocket(rescue.room.code, rescue);
+try {
+  const start = waitForRoom(rescueSocket, (candidate) => candidate.phase === "playing", "AI rescue start");
+  rescueSocket.send(JSON.stringify({ type: "set_ready", ready: true }));
+  let rescueRoom = await start;
+  while (!rescueRoom.game.result) {
+    const round = rescueRoom.game.round;
+    const humanPlan = chooseEmberPlan(rescueRoom.game, rescue.seat);
+    const planned = waitForRoom(rescueSocket, (candidate) => candidate.game.round === round &&
+      candidate.game.plans[rescue.seat]?.operation === humanPlan.operation && candidate.game.plans[rescue.seat]?.cell === humanPlan.cell,
+    "human rescue plan accepted");
+    sendAction(rescueSocket, rescueRoom, { kind: "ember_plan", round, ...humanPlan });
+    rescueRoom = await planned;
+    assert.equal(rescueRoom.game.locked[1], false, "AI locked before the human confirmed");
+    const resolved = waitForRoom(rescueSocket, (candidate) => candidate.game.round === round && candidate.game.phase === "round_result", "AI rescue resolves both plans");
+    sendAction(rescueSocket, rescueRoom, { kind: "ember_commit", round });
+    rescueRoom = await resolved;
+    assert.deepEqual(rescueRoom.game.locked, [true, true], "A turn was resolved by timeout instead of confirmation");
+    if (!rescueRoom.game.result) rescueRoom = await waitForRoom(rescueSocket,
+      (candidate) => candidate.game.round === round + 1 && candidate.game.phase === "planning", "next rescue turn");
+  }
+  assert.equal(rescueRoom.phase, "completed");
+  assert.equal(rescueRoom.game.result.kind, "success", JSON.stringify(rescueRoom.game.result));
+  assert.equal(rescueRoom.game.rescued, rescueRoom.game.target);
+} finally {
+  rescueSocket.close(1000, "smoke_complete");
 }
-defuseSocket.close(1000, "smoke_complete");
 
-const thrusters = await createAiRoom("dual_thrusters");
-const thrusterSocket = await openSocket(thrusters.room.code, thrusters);
-const thrusterStart = waitForRoom(thrusterSocket, (candidate) => candidate.phase === "playing", "AI thruster start");
-thrusterSocket.send(JSON.stringify({ type: "set_ready", ready: true }));
-const thrusterRoom = await thrusterStart;
-assert.equal(thrusterRoom.ai.intent?.kind, "thruster_burn", "AI thruster intent is not visible to its teammate");
-assert.equal(thrusterRoom.ai.suggestion?.kind, "thruster_burn", "human thruster suggestion is missing");
-const thrusterResult = waitForRoom(
-  thrusterSocket,
-  (candidate) => candidate.game.kind === "dual_thrusters" && candidate.game.phase === "gate_result",
-  "AI paired thruster resolution",
-);
-sendAction(thrusterSocket, thrusterRoom, thrusterRoom.ai.suggestion);
-const resolvedThrusters = await thrusterResult;
-assert.equal(resolvedThrusters.game.locked.every(Boolean), true);
-assert.equal(resolvedThrusters.game.powers.every((power) => power !== null), true);
-thrusterSocket.close(1000, "smoke_complete");
-
-const sync = await createAiRoom("sync_tap");
-const syncSocket = await openSocket(sync.room.code, sync);
-const syncStart = waitForRoom(syncSocket, (candidate) => candidate.phase === "playing", "AI sync start");
-syncSocket.send(JSON.stringify({ type: "set_ready", ready: true }));
-const syncRoom = await syncStart;
-const syncResult = waitForRoom(
-  syncSocket,
-  (candidate) => candidate.game.kind === "sync_tap" && candidate.game.roundScores.length > 0,
-  "AI synchronized reaction",
-  12_000,
-);
-await new Promise((resolve) => setTimeout(resolve, Math.max(0, syncRoom.game.goAt - Date.now() + 55)));
-sendAction(syncSocket, syncRoom, { kind: "sync_tap" });
-const resolvedSync = await syncResult;
-assert.ok(resolvedSync.game.lastDeltaMs < resolvedSync.game.tapWindowMs, "AI tap missed the legal reaction window");
-syncSocket.close(1000, "smoke_complete");
+// Keep real timed-AI coverage using a retained reaction game rather than Sync Tap.
+const dash = await createAiRoom("neon_dash", { pace: "blitz", difficulty: "standard", length: "short" });
+const dashSocket = await openSocket(dash.room.code, dash);
+try {
+  const signal = waitForRoom(dashSocket, (candidate) => candidate.game.phase === "reacting", "Neon obstacle revealed");
+  dashSocket.send(JSON.stringify({ type: "set_ready", ready: true }));
+  const dashRoom = await signal;
+  assert.equal(dashRoom.ai.intent, null, "competitive reaction intent leaked");
+  const resolved = waitForRoom(dashSocket, (candidate) => candidate.game.phase === "round_result", "AI timed response");
+  sendAction(dashSocket, dashRoom, { kind: "neon_dodge", move: requiredMoveForObstacle(dashRoom.game.obstacle) });
+  const result = await resolved;
+  assert.ok(result.game.responses[1], "AI missed the reaction window");
+  assert.ok(result.game.responses[1].reactionMs >= 0);
+  assert.ok(result.game.responses[1].reactionMs < result.game.responseWindowMs);
+} finally {
+  dashSocket.close(1000, "smoke_complete");
+}
 
 console.log(JSON.stringify({
   ok: true,
   protocol: PROTOCOL_VERSION,
-  verified: ["ai_seat", "options", "move", "competitive_privacy", "rematch", "reconnect", "teammate_coordination", "paired_coordination", "timed_reaction"],
+  verified: ["ai_seat", "options", "move", "competitive_privacy", "rematch", "reconnect", "ember_human_plan", "ember_waits_for_confirmation", "ember_complete_mission", "timed_reaction"],
 }));

@@ -4,7 +4,21 @@ import { GAMES, GAME_INFO, getConfiguredGameInfo, getRoomOptionsCopy } from "./g
 import { translate } from "../i18n";
 
 describe("configured room instructions", () => {
+  it("describes random meteor placement without claiming a random countdown", () => {
+    const info = getConfiguredGameInfo("meteor_dash", DEFAULT_GAME_OPTIONS);
+    const english = translate(info.rules, "en");
+    expect(info.rules).toContain("随机信标");
+    expect(info.rules).not.toContain("随机倒计时");
+    expect(english).toContain("a random beacon");
+    expect(english).toContain("all rounds are played");
+  });
   for (const pace of GAME_PACES) {
+    it(`Gomoku ${pace} rules are fully translated with the selected duration`, () => {
+      const english = translate(getConfiguredGameInfo("gomoku", { ...DEFAULT_GAME_OPTIONS, pace }).rules, "en");
+      expect(english).not.toMatch(/[\u3400-\u9fff]/u);
+      expect(english).toContain(pace === "relaxed" ? "60" : pace === "blitz" ? "15" : "30");
+      expect(english).toContain("five");
+    });
     for (const gameId of ["gomoku", "split_maze"] as const) {
       it(`${gameId} copy matches the authoritative ${pace} duration`, () => {
         const options = { ...DEFAULT_GAME_OPTIONS, pace };
@@ -41,8 +55,11 @@ describe("configured room instructions", () => {
       if (state.kind !== "cover_hunt") throw new Error("Unexpected game");
       const info = getConfiguredGameInfo("cover_hunt", options);
       expect(info.rules).toContain(`${state.covers} 处掩体`);
-      expect(info.rules).toContain(state.scanCharges ? `扫描 ${state.scanCharges} 次` : "没有扫描");
-      if (!state.scanCharges) expect(info.tutorialSteps[1]).toContain("没有扫描");
+      expect(state.scanCharges).toBeGreaterThan(0);
+      expect(info.rules).toContain(`扫描 ${state.scanCharges} 次`);
+      expect(info.tutorialSteps[1]).toContain(`扫描 ${state.scanCharges} 次`);
+      expect(translate(info.rules, "en")).toContain(`${state.covers} cover spots`);
+      expect(translate(info.rules, "en")).toContain(`${state.scanCharges} scan${state.scanCharges === 1 ? "" : "s"}`);
     });
   }
 
@@ -58,6 +75,12 @@ describe("configured room instructions", () => {
         expect(english).not.toMatch(/[\u3400-\u9fff]/u);
         expect(english).not.toMatch(/节奏|难度|局/u);
         expect(english).toContain("pace");
+      });
+      it(`${game.id} translates configured rules and tutorial for option profile ${profile + 1}`, () => {
+        const info = getConfiguredGameInfo(game.id, options);
+        for (const copy of [info.rules, ...info.tutorialSteps, info.proTip]) {
+          expect(translate(copy, "en"), copy).not.toMatch(/[\u3400-\u9fff]/u);
+        }
       });
     });
   }

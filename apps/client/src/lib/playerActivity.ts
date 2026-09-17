@@ -12,6 +12,7 @@ export function isCompetitive(room: RoomView): boolean {
 
 export function isTimedActionExpired(room: RoomView, now: number): boolean {
   if (now < room.game.turnDeadline) return false;
+  if (room.game.kind === "ember_crew") return room.game.phase === "planning";
   if (room.game.kind === "gomoku" || room.game.kind === "reversi" || room.game.kind === "split_maze") return true;
   if (room.game.kind === "sync_tap") return true;
   if (room.game.kind === "cover_hunt") return room.game.phase === "hiding" || room.game.phase === "hunting";
@@ -62,6 +63,7 @@ function currentSeat(room: RoomView): Seat | null {
 export function isSeatActive(room: RoomView, seat: Seat, now: number): boolean {
   if (room.phase !== "playing") return false;
   if (isTimedActionExpired(room, now)) return false;
+  if (room.game.kind === "ember_crew") return room.game.phase === "planning" && !room.game.locked[seat];
   if (room.game.kind === "sync_tap") return now >= room.game.goAt && room.game.taps[seat] === null;
   if (room.game.kind === "echo_relay") return room.game.phase === "transmitting" && seat !== room.game.decoderSeat;
   if (room.game.kind === "orbital_repair") return room.game.phase === "aligning";

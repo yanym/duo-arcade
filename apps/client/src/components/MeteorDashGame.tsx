@@ -186,7 +186,7 @@ const styles = createGameStyles({
   scoreCore: { width: 72, alignItems: "center", justifyContent: "center", backgroundColor: "#122A33", borderRadius: radii.small },
   scoreCoreGlyph: { color: "#F5D36F", fontSize: 17, fontWeight: "900" },
   scoreCoreText: { color: "#789EAA", fontSize: 7, fontWeight: "900", marginTop: 2 },
-  status: { alignItems: "center", marginTop: 14 },
+  status: { minHeight: 80, alignItems: "center", justifyContent: "center", marginTop: 14 },
   headline: { color: "#F5F7FF", fontSize: 17, fontWeight: "900", textAlign: "center" },
   subhead: { color: "#8A9AB8", fontSize: 9, lineHeight: 14, textAlign: "center", marginTop: 3 },
   array: { minHeight: 220, justifyContent: "center", marginTop: 12, padding: 14, backgroundColor: "#030817", borderRadius: radii.medium, borderWidth: 1, borderColor: "#152544", overflow: "hidden" },

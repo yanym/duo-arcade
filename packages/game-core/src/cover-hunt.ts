@@ -11,7 +11,7 @@ import {
 
 const ROUND_REVEAL_MS = 3_000;
 
-function configForOptions(options: GameOptions): Pick<
+export function coverHuntConfig(options: GameOptions): Pick<
   CoverHuntState,
   "totalRounds" | "covers" | "scanCharges" | "hideDurationMs" | "huntDurationMs"
 > {
@@ -23,7 +23,7 @@ function configForOptions(options: GameOptions): Pick<
   const difficulty = {
     easy: { covers: 4 as const, scanCharges: 2 },
     standard: { covers: 5 as const, scanCharges: 1 },
-    hard: { covers: 6 as const, scanCharges: 0 },
+    hard: { covers: 6 as const, scanCharges: 1 },
   }[options.difficulty];
   return {
     ...pace,
@@ -33,7 +33,7 @@ function configForOptions(options: GameOptions): Pick<
 }
 
 function scanChargesForCovers(covers: CoverHuntState["covers"]): number {
-  return covers === 4 ? 2 : covers === 5 ? 1 : 0;
+  return covers === 4 ? 2 : 1;
 }
 
 export function createCoverHuntState(
@@ -41,7 +41,7 @@ export function createCoverHuntState(
   now: number,
   options: GameOptions,
 ): CoverHuntState {
-  const config = configForOptions(options);
+  const config = coverHuntConfig(options);
   return {
     kind: "cover_hunt",
     rulesVersion: 1,

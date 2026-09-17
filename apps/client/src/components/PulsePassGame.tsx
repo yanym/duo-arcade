@@ -21,8 +21,8 @@ type Props = {
 
 const heatCopy: Record<PulseHeatBand, { title: string; detail: string; glyph: string }> = {
   stable: { title: "稳定", detail: "核心仍有较大余量，但爆点始终保密", glyph: "○" },
-  warm: { title: "升温", detail: "风险正在累积，下一次强传可能触发爆裂", glyph: "◉" },
-  critical: { title: "临界", detail: "传还是冷却？任何档位都可能成为最后一下", glyph: "✦" },
+  warm: { title: "升温", detail: "电荷正在累积，留意传出后对手的选择", glyph: "◉" },
+  critical: { title: "临界", detail: "接近爆点，结合电荷与爆点范围选择档位", glyph: "✦" },
 };
 
 const powerCopy: Record<PulsePower, { title: string; detail: string; glyph: string }> = {
@@ -50,6 +50,8 @@ export const PulsePassGame = memo(function PulsePassGame({
   const seconds = Math.max(0, (game.turnDeadline - now) / 1_000);
   const eventKey = `${game.round}:${game.phase}:${game.totalPasses}:${game.scores.join("-")}`;
   const heat = heatCopy[game.heatBand];
+  const ventsLeft = game.ventCharges[ownSeat];
+  const roundOver = game.phase === "round_result" || ended;
 
   useEffect(() => {
     if (eventRef.current === eventKey) return;
@@ -79,23 +81,23 @@ export const PulsePassGame = memo(function PulsePassGame({
     ? game.roundOutcome === "holder_timeout"
       ? ownRoundWin ? "对手持有超时，你赢下本轮" : "你未及时传出，对手赢下本轮"
       : ownRoundWin ? "核心在对手手中爆裂，你赢下本轮" : "脉冲核心在你手中爆裂，对手赢下本轮"
-    : isHolder ? "核心在你手中：选择充能强度或紧急冷却" : "核心在对手手中，观察热度并准备接传";
+    : isHolder
+      ? ventsLeft > 0 ? "核心在你手中：选择充能强度或紧急冷却" : "核心在你手中：选择充能强度"
+      : "核心在对手手中，观察热度并准备接传";
   const statusMeta = ended
-    ? "最终比分与真实爆点已向双方公开"
+    ? "双方比分已同步，可在上方再来一局"
     : paused
       ? "恢复连接后将从当前持有状态继续"
       : actionExpired
         ? "双方操作已停止，等待服务器同步本轮结果"
       : game.phase === "handling"
     ? `${seconds.toFixed(1)} 秒内行动 · 精确爆点对双方保密`
-    : game.result
-      ? "本局结束 · 真实爆点与完整过程已公开"
-      : `${seconds.toFixed(1)} 秒后进入下一轮并交换首位持有者`;
+    : `${seconds.toFixed(1)} 秒后进入下一轮并交换首位持有者`;
 
   return (
     <View style={[styles.shell, settings.highContrast && styles.highContrast]}>
       <View style={styles.header}>
-        <View style={styles.headerCopy}><Text style={styles.kicker}>PULSE PASS // HIDDEN LIMIT</Text><Text style={styles.title}>脉冲烫手</Text></View>
+        <View style={styles.headerCopy}><Text style={styles.kicker}>PULSE PASS</Text><Text style={styles.title}>脉冲烫手</Text></View>
         <View accessibilityLabel={t(`第 ${game.round} 轮，共 ${game.totalRounds} 轮`)} style={styles.roundBadge}>
           <Text style={styles.roundLabel}>风险轮次</Text><Text style={styles.roundValue}>{game.round}/{game.totalRounds}</Text>
         </View>
@@ -122,14 +124,16 @@ export const PulsePassGame = memo(function PulsePassGame({
           <Text style={styles.coreValue}>{game.charge}</Text>
           <Text style={styles.coreUnit}>公开电荷</Text>
         </View>
-        <View style={styles.heatPanel}>
-          <Text style={styles.heatLabel}>传感器状态</Text>
-          <Text style={styles.heatValue}>{heat.title}</Text>
-          <Text style={styles.heatDetail}>{heat.detail}</Text>
-        </View>
-        <View style={styles.holderChip}>
-          <Text style={styles.holderLabel}>当前持有</Text>
-          <Text style={styles.holderValue}>{ended ? "本局结束" : paused ? "当前状态已保留" : actionExpired ? "等待服务器结算" : `${isHolder ? "你" : "对手"} · ${game.passes} 次传递`}</Text>
+        <View style={styles.reactorInfo}>
+          <View style={styles.heatPanel}>
+            <Text style={styles.heatLabel}>传感器状态</Text>
+            <Text style={styles.heatValue}>{heat.title}</Text>
+            {!roundOver && <Text style={styles.heatDetail}>{heat.detail}</Text>}
+          </View>
+          <View style={styles.holderChip}>
+            <Text style={styles.holderLabel}>{roundOver ? "本轮结果" : "当前持有"}</Text>
+            <Text style={styles.holderValue}>{ended ? "本局结束" : paused ? "当前状态已保留" : actionExpired ? "等待服务器结算" : `${isHolder ? "你" : "对手"} · ${game.passes} 次传递`}</Text>
+          </View>
         </View>
       </View>
 
@@ -140,7 +144,7 @@ export const PulsePassGame = memo(function PulsePassGame({
             <View key={index} style={[styles.gaugeCell, index < game.charge && styles.gaugeFilled, index >= game.burstMin - 1 && styles.gaugeDangerZone]} />
           ))}
         </View>
-        <Text style={styles.gaugeHint}>斜纹边界表示“可能爆裂区”，不是准确答案</Text>
+        <Text style={styles.gaugeHint}>加粗底边标出可能爆裂区，不是准确爆点</Text>
       </View>
 
       {game.phase === "handling" ? (
@@ -153,7 +157,7 @@ export const PulsePassGame = memo(function PulsePassGame({
             ))}
           </View>
           <Pressable accessibilityHint={t("消耗整局一次冷却，将公开电荷降低 2 并把核心传给对手")} accessibilityLabel={t(`紧急冷却，剩余 ${game.ventCharges[ownSeat]} 次`)} accessibilityRole="button" accessibilityState={{ disabled: !canAct || game.ventCharges[ownSeat] <= 0 }} disabled={!canAct || game.ventCharges[ownSeat] <= 0} onPress={vent} style={({ pressed }) => [styles.ventButton, (!canAct || game.ventCharges[ownSeat] <= 0) && styles.disabled, pressed && !settings.reducedMotion && styles.pressed]}>
-            <Text style={styles.ventGlyph}>❄</Text><View style={styles.ventCopy}><Text style={styles.ventTitle}>紧急冷却 · 电荷 −2</Text><Text style={styles.ventDetail}>整局剩余 {game.ventCharges[ownSeat]} 次 · 冷却后也会把核心传给对手</Text></View>
+            <Text style={styles.ventGlyph}>❄</Text><View style={styles.ventCopy}><Text style={styles.ventTitle}>紧急冷却 · 电荷 −2</Text><Text style={styles.ventDetail}>{game.initialVentCharges === 0 ? "本局难度不提供冷却" : ventsLeft === 0 ? "本局冷却已用完，下局恢复" : `整局剩余 ${ventsLeft} 次 · 冷却后传给对手`}</Text></View>
           </Pressable>
         </>
       ) : (
@@ -166,13 +170,13 @@ export const PulsePassGame = memo(function PulsePassGame({
         </View>
       )}
 
-      <View style={styles.privacyBar}><Text style={styles.privacyGlyph}>◇</Text><Text style={styles.privacyText}>精确爆点由服务器按房间种子生成，处理阶段不会发送给任何客户端；本轮结束后才公开复盘。</Text></View>
+      {!roundOver && <View style={styles.privacyBar}><Text style={styles.privacyGlyph}>◇</Text><Text style={styles.privacyText}>每轮爆点重新生成；冷却次数整局共用，不会每轮补充。</Text></View>}
     </View>
   );
 });
 
 const styles = createGameStyles({
-  shell: { width: "100%", maxWidth: 940, alignSelf: "center", backgroundColor: "#081B1D", borderRadius: radii.large, padding: 18, overflow: "hidden", ...shadows.card },
+  shell: { width: "100%", maxWidth: 940, alignSelf: "center", backgroundColor: "#081B1D", borderRadius: radii.large, padding: 12, overflow: "hidden", ...shadows.card },
   highContrast: { borderWidth: 3, borderColor: colors.surface },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
   headerCopy: { flex: 1, minWidth: 0 },
@@ -192,8 +196,8 @@ const styles = createGameStyles({
   status: { alignItems: "center", paddingVertical: 6, marginTop: 9 },
   statusCritical: { backgroundColor: "rgba(231, 77, 102, 0.13)", borderRadius: radii.small },
   statusTitle: { color: "#FFF9EC", fontSize: 15, fontWeight: "900", textAlign: "center" },
-  statusMeta: { color: "#829DA1", fontSize: 8, fontWeight: "800", marginTop: 3 },
-  reactor: { minHeight: 234, alignItems: "center", justifyContent: "center", backgroundColor: "#030E10", borderRadius: radii.medium, borderWidth: 1, borderColor: "#235057", marginTop: 6, padding: 12, overflow: "hidden" },
+  statusMeta: { color: "#A8BFC2", fontSize: 8, fontWeight: "800", marginTop: 3, textAlign: "center" },
+  reactor: { alignItems: "center", gap: 12, backgroundColor: "#030E10", borderRadius: radii.medium, borderWidth: 1, borderColor: "#235057", marginTop: 6, padding: 12, overflow: "hidden" },
   reactorCritical: { borderColor: "#C84962", backgroundColor: "#160B10" },
   orbitOuter: { position: "absolute", width: 205, height: 205, borderRadius: 103, borderWidth: 1, borderColor: "#1F4A50", alignItems: "center", justifyContent: "center" },
   orbitInner: { width: 154, height: 154, borderRadius: 77, borderWidth: 1, borderColor: "#24565B" },
@@ -203,11 +207,12 @@ const styles = createGameStyles({
   coreGlyph: { color: "#FFF0B7", fontSize: 15, fontWeight: "900" },
   coreValue: { color: "#FFFFFF", fontSize: 31, lineHeight: 34, fontWeight: "900", fontVariant: ["tabular-nums"] },
   coreUnit: { color: "#BCD5D1", fontSize: 6, fontWeight: "900" },
-  heatPanel: { position: "absolute", left: 12, bottom: 12, maxWidth: 155 },
+  reactorInfo: { width: "100%", flexDirection: "row", alignItems: "flex-start", flexWrap: "wrap", gap: 10 },
+  heatPanel: { flex: 1, minWidth: 125 },
   heatLabel: { color: "#63868A", fontSize: 6, fontWeight: "900" },
   heatValue: { color: "#FFF0B8", fontSize: 13, fontWeight: "900", marginTop: 2 },
-  heatDetail: { color: "#759195", fontSize: 7, lineHeight: 11, fontWeight: "800", marginTop: 2 },
-  holderChip: { position: "absolute", right: 12, bottom: 12, alignItems: "flex-end", backgroundColor: "#112D31", borderRadius: 9, paddingHorizontal: 9, paddingVertical: 6 },
+  heatDetail: { color: "#A8BFC2", fontSize: 7, lineHeight: 11, fontWeight: "800", marginTop: 2 },
+  holderChip: { flexShrink: 1, maxWidth: "100%", alignItems: "flex-start", backgroundColor: "#112D31", borderRadius: 9, paddingHorizontal: 9, paddingVertical: 6 },
   holderLabel: { color: "#78A2A5", fontSize: 6, fontWeight: "900" },
   holderValue: { color: "#E3F6F2", fontSize: 8, fontWeight: "900", marginTop: 2 },
   gaugePanel: { backgroundColor: "#10272C", borderRadius: radii.small, padding: 10, marginTop: 9 },
@@ -225,9 +230,9 @@ const styles = createGameStyles({
   powerGlyph: { color: "#F6D673", fontSize: 18, fontWeight: "900" },
   powerTitle: { color: "#FFF9E8", fontSize: 10, fontWeight: "900", marginTop: 1 },
   powerDetail: { color: "#8EB0B1", fontSize: 7, fontWeight: "800", marginTop: 2 },
-  ventButton: { minHeight: 52, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#172E52", borderRadius: radii.small, borderWidth: 1, borderColor: "#4A6597", paddingHorizontal: 14, marginTop: 7 },
+  ventButton: { minHeight: 52, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#172E52", borderRadius: radii.small, borderWidth: 1, borderColor: "#4A6597", paddingHorizontal: 12, paddingVertical: 8, marginTop: 7 },
   ventGlyph: { color: "#9EC8FF", fontSize: 18 },
-  ventCopy: { alignItems: "flex-start" },
+  ventCopy: { flexShrink: 1, minWidth: 0, alignItems: "flex-start" },
   ventTitle: { color: "#E8F0FF", fontSize: 9, fontWeight: "900" },
   ventDetail: { color: "#8596B5", fontSize: 7, fontWeight: "800", marginTop: 2 },
   resultCard: { minHeight: 68, flexDirection: "row", alignItems: "center", gap: 11, backgroundColor: "#45202D", borderRadius: radii.small, borderWidth: 1, borderColor: "#B34C66", padding: 11, marginTop: 9 },
@@ -239,6 +244,6 @@ const styles = createGameStyles({
   privacyBar: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#10272B", borderRadius: radii.small, padding: 10, marginTop: 8 },
   privacyGlyph: { color: "#65D5C1", fontSize: 14, fontWeight: "900" },
   privacyText: { flex: 1, color: "#7F9A9C", fontSize: 8, lineHeight: 13, fontWeight: "800" },
-  disabled: { opacity: 0.31 },
+  disabled: { opacity: 0.6 },
   pressed: { transform: [{ scale: 0.93 }] },
 });

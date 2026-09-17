@@ -8,23 +8,26 @@
     "dev:server": "pnpm --filter @duo/realtime dev",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
+    "test:realtime": "pnpm --filter @duo/realtime test",
     "test:watch": "vitest",
-    "smoke:realtime": "node scripts/smoke-realtime.mjs",
-    "smoke:ai": "node scripts/smoke-ai.mjs",
-    "smoke:http": "node scripts/smoke-http.mjs",
+    "smoke:realtime": "tsx scripts/smoke-realtime.mjs",
+    "smoke:ai": "tsx scripts/smoke-ai.mjs",
+    "smoke:http": "tsx scripts/smoke-http.mjs",
+    "smoke:ember": "tsx scripts/smoke-ember.mjs",
     "doctor:client": "pnpm --dir apps/client exec expo-doctor",
     "audit:licenses": "node scripts/license-audit.mjs",
     "audit:i18n": "node scripts/i18n-audit.mjs",
-    "audit:release": "node scripts/release-audit.mjs",
+    "audit:release": "tsx scripts/release-audit.mjs",
     "build:web": "EXPO_NO_DOTENV=1 EXPO_PUBLIC_API_URL=https://duo-arcade.yimgyan.workers.dev EXPO_PUBLIC_WEB_URL=https://duo-arcade.yimgyan.workers.dev pnpm --filter @duo/client exec expo export --platform web --output-dir dist --clear",
     "build:ios": "EXPO_NO_DOTENV=1 EXPO_PUBLIC_API_URL=https://duo-arcade.yimgyan.workers.dev EXPO_PUBLIC_WEB_URL=https://duo-arcade.yimgyan.workers.dev pnpm --filter @duo/client exec expo export --platform ios --output-dir dist-ios --clear",
     "deploy:web": "pnpm build:web && pnpm --filter @duo/realtime run deploy",
     "lint": "pnpm --filter @duo/client lint",
-    "check": "pnpm typecheck && pnpm test && pnpm lint && pnpm audit:i18n"
+    "check": "pnpm typecheck && pnpm test && pnpm test:realtime && pnpm lint && pnpm audit:i18n"
   },
   "devDependencies": {
-    "happy-dom": "20.14.0",
     "expo-doctor": "1.20.4",
+    "happy-dom": "20.14.0",
+    "tsx": "^4.23.13",
     "typescript": "~6.0.3",
     "vitest": "4.1.11"
   }

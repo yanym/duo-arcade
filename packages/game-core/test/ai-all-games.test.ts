@@ -34,7 +34,7 @@ function actionTime(state: GameState, now: number, step: number, seat: Seat, opt
 }
 
 describe("all-game AI policy", () => {
-  it("classifies the existing competitive catalogue without changing its size", () => {
+  it("keeps legacy state decoding and classifies Ember Crew as cooperative", () => {
     const states = GAME_IDS.map((gameId, index) => createGameState(gameId, 0, 0, index + 1));
     expect(states.filter(isCompetitiveGame).map((state) => state.kind)).toEqual([
       "gomoku",
@@ -50,7 +50,8 @@ describe("all-game AI policy", () => {
       "nova_volley",
       "pulse_pass",
     ]);
-    expect(states).toHaveLength(28);
+    expect(states).toHaveLength(29);
+    expect(states.find((state) => state.kind === "ember_crew")).toBeDefined();
   });
 
   const profiles: Array<[string, AiOptions]> = [

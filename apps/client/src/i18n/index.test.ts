@@ -9,8 +9,21 @@ import { translate } from ".";
 const HAS_HAN = /[一-龥]/;
 
 describe("English localization", () => {
-  it("covers the complete 28-game discovery and tutorial catalog", () => {
-    expect(GAMES).toHaveLength(28);
+  it("states a defeat without claiming the score was close", () => {
+    for (const reason of ["disc_majority", "timeout", "opponent_left"] as const) {
+      const copy = winResultCopy({ kind: "win", winnerSeat: 1, reason }, 0);
+      expect(translate(copy.title, "en")).toBe("Your opponent wins");
+    }
+  });
+  it("does not attribute a shared abandoned result to the viewing player", () => {
+    expect(translate("你们提前结束了这轮合作", "en")).toBe("This co-op ended early");
+  });
+  it("keeps shared rematch wording suitable for teammates as well as opponents", () => {
+    expect(translate("对方已同意，轮到你", "en")).toBe("They're ready — play again?");
+  });
+
+  it("covers the curated 10-game discovery and tutorial catalog", () => {
+    expect(GAMES).toHaveLength(10);
     for (const game of GAMES) {
       const visibleCopy = [
         game.title,
@@ -42,6 +55,7 @@ describe("English localization", () => {
     expect(translate("第 3 局进行中", "en")).toBe("Round 3 in progress");
     expect(translate("与 AI 开始五子棋", "en")).toBe("Play Gomoku with AI");
     expect(translate("7 轮 · 6 枚信标 · 1.6 秒随机预备 · 1800ms 捕捉窗口", "en")).not.toMatch(HAS_HAN);
+    expect(translate("7 轮 · 6 枚信标 · 1.6 秒预备 · 1800ms 捕捉窗口", "en")).toBe("7 rounds · 6 beacons · 1.6 s ready · 1800ms catch window");
   });
 
   it("keeps generated status, accessibility, and telemetry copy fully English", () => {

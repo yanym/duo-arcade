@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_AI_OPTIONS, DEFAULT_GAME_OPTIONS } from "@duo/game-core";
-import { PROTOCOL_VERSION } from "@duo/protocol";
+import { CLIENT_PROTOCOL_HEADER, PROTOCOL_VERSION } from "@duo/protocol";
 
 import { ApiError, createRoom, getRoom, getServiceHealth } from "./api";
 
@@ -23,6 +23,7 @@ describe("API recovery copy", () => {
       { ...DEFAULT_AI_OPTIONS, difficulty: "hard", intelligence: "strategic", reactionSpeed: "quick" },
     );
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new Headers(init.headers).get(CLIENT_PROTOCOL_HEADER)).toBe(String(PROTOCOL_VERSION));
     expect(JSON.parse(init.body as string)).toMatchObject({
       mode: "ai",
       aiOptions: { difficulty: "hard", intelligence: "strategic", reactionSpeed: "quick" },
@@ -37,6 +38,11 @@ describe("API recovery copy", () => {
   it("never exposes an unknown backend message", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "future_failure", message: "database shard private-room-7 failed" }), { status: 500 })));
     await expect(getRoom("ABC234")).rejects.toMatchObject({ code: "future_failure", message: "请求暂时无法完成，请稍后重试。" } satisfies Partial<ApiError>);
+  });
+
+  it("explains a game-specific protocol rejection without exposing raw server text", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "protocol_mismatch", message: "raw" }), { status: 426 })));
+    await expect(getRoom("ABC234")).rejects.toMatchObject({ code: "protocol_mismatch", message: "应用已有新版本，请刷新页面或重新打开应用。" });
   });
 
   it("turns a deployed protocol mismatch into an explicit update prompt", async () => {

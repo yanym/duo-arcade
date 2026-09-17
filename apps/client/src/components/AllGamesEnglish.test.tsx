@@ -19,6 +19,7 @@ import { CoverHuntGame } from "./CoverHuntGame";
 import { DropRescueGame } from "./DropRescueGame";
 import { DualThrustersGame } from "./DualThrustersGame";
 import { EchoRelayGame } from "./EchoRelayGame";
+import { EmberCrewGame } from "./EmberCrewGame";
 import { FogSonarGame } from "./FogSonarGame";
 import { GameOptionsPanel } from "./GameOptionsPanel";
 import { GomokuBoard } from "./GomokuBoard";
@@ -125,6 +126,7 @@ function gameElement(gameId: GameId, ownSeat: Seat): ReactElement {
   const state = createGameState(gameId, 0, 1_000, 42, DEFAULT_GAME_OPTIONS);
   const game = getGameView(state, ownSeat);
   switch (game.kind) {
+    case "ember_crew": return <EmberCrewGame game={game} now={NOW} onPlan={noop} onCommit={noop} ownSeat={ownSeat} phase="playing" />;
     case "gomoku": return <GomokuBoard canPlay={game.currentSeat === ownSeat} game={game} onPlace={noop} phase="playing" />;
     case "reversi": return <ReversiBoard game={game} onPlace={noop} ownSeat={ownSeat} phase="playing" />;
     case "split_maze": return <MazeBoard game={game} onMove={noop} ownSeat={ownSeat} phase="playing" />;

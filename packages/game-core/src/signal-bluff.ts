@@ -22,7 +22,7 @@ function bluffConfig(options: GameOptions): BluffConfig {
   const difficulty = {
     easy: { signalCount: 3 as const, scanCharges: 2 },
     standard: { signalCount: 4 as const, scanCharges: 1 },
-    hard: { signalCount: 5 as const, scanCharges: 0 },
+    hard: { signalCount: 5 as const, scanCharges: 1 },
   }[options.difficulty];
   const pace = {
     relaxed: { claimDurationMs: 30_000, judgeDurationMs: 20_000 },

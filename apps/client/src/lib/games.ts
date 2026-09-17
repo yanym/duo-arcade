@@ -1,4 +1,4 @@
-import { roundsForLength, turnDurationForPace, type GameId, type GameOptions } from "@duo/game-core";
+import { coverHuntConfig, isPlayableGameId, roundsForLength, turnDurationForPace, type GameId, type GameOptions } from "@duo/game-core";
 
 export type GameInfo = {
   id: GameId;
@@ -14,7 +14,16 @@ export type GameInfo = {
   proTip: string;
 };
 
-export const GAMES: GameInfo[] = [
+const LEGACY_GAME_INFO: GameInfo[] = [
+  {
+    id: "ember_crew", title: "余烬救援", icon: "▦✦", mode: "合作", accent: "coral",
+    description: "共同规划路线、扑灭火势，把居民带回救援站。每一步都由你们决定。",
+    meta: "策略合作 · 5–10 分钟",
+    rules: "每轮两人各规划一个行动，再分别确认。补水、灭火先执行，随后移动；可让搭档在同一轮清出道路。走到居民所在格会自动接人，回到救援站即撤离。预告火势在本轮行动后增长；每两个猛烈火点或每位站在火中的队员，会让楼体损失一点完整度。救出全部居民即可获胜。",
+    optionKeys: ["pace", "difficulty", "length"],
+    tutorialSteps: ["点选行动和地图格，自己的计划会实时显示给搭档", "分头救人，或让一人灭火、另一人在同一轮穿过；双方确认后一起行动", "把居民带回底部救援站，水箱也在这里补充；关注火势预告与剩余轮数"],
+    proTip: "不用照着指令走。你可以清路、接人、补水或支援搭档；先讨论下一轮的分工，再确认计划。",
+  },
   {
     id: "gomoku",
     title: "五子棋",
@@ -97,11 +106,11 @@ export const GAMES: GameInfo[] = [
     id: "quantum_duel",
     title: "量子拳台",
     icon: "⚡VS",
-    description: "双方同时锁定机甲招式，服务器保密并同步揭晓克制结果。",
+    description: "机甲版石头剪刀布：暗选招式、读懂对手习惯，同时揭晓。",
     meta: "同步竞争 · 2–4 分钟",
     mode: "竞争",
     accent: "primary",
-    rules: "突击克制蓄能、蓄能击穿防御、防御反制突击。双方秘密锁定后同时揭晓；超时未选择会把该轮分数判给已锁定的一方。",
+    rules: "像石头剪刀布一样循环克制：突击胜蓄能，蓄能胜防御，防御胜突击。蓄能只是一种招式，不会积累能量。点选即锁定，双方选好后揭晓；超时未选择则对方得分。",
     optionKeys: ["pace", "length"],
     tutorialSteps: ["从突击、防御、蓄能中暗选一招", "双方都锁定后服务器同步揭晓", "突击克蓄能、蓄能克防御、防御克突击"],
     proTip: "连续使用同一招会形成可读习惯，偶尔反向选择能抓住对手预判。",
@@ -205,7 +214,7 @@ export const GAMES: GameInfo[] = [
     meta: "视觉反应 · 1–3 分钟",
     mode: "竞争",
     accent: "teal",
-    rules: "每轮先经历随机倒计时，流星出现后双方各有一次捕捉机会；命中优先，均命中时反应更快者得分，35 毫秒以内判为平手。率先取得不可追平优势者获胜。",
+    rules: "预备倒计时结束后，流星会出现在随机信标上。每人只能捕捉一次；命中优先，均命中时反应更快者得分，35 毫秒以内判为平手。比分已无法追平或轮次用完时结束。",
     optionKeys: ["pace", "difficulty", "length"],
     tutorialSteps: ["倒计时阶段不要提前触碰阵列", "流星信标亮起后立刻点击带 ✦ 的坐标", "双方作答后同步公开命中位置与服务器反应时间"],
     proTip: "视线放在阵列中央，用余光捕捉亮点；先求点对，再逐步追求更快的反应。",
@@ -381,7 +390,9 @@ export const GAMES: GameInfo[] = [
   },
 ];
 
-export const GAME_INFO = Object.fromEntries(GAMES.map((game) => [game.id, game])) as Record<GameId, GameInfo>;
+// Saved invitations can still render their original title and instructions.
+export const GAME_INFO = Object.fromEntries(LEGACY_GAME_INFO.map((game) => [game.id, game])) as Record<GameId, GameInfo>;
+export const GAMES = LEGACY_GAME_INFO.filter((game) => isPlayableGameId(game.id));
 
 /** Compact option summary shown in the room. Kept pure so every game/profile can be audited. */
 export function getRoomOptionsCopy(gameId: GameId, options: GameOptions): string {
@@ -414,13 +425,11 @@ export function getConfiguredGameInfo(gameId: GameId, options: GameOptions): Gam
     };
   }
   if (gameId === "cover_hunt") {
-    const covers = { easy: 4, standard: 5, hard: 6 }[options.difficulty];
-    const scans = { easy: 2, standard: 1, hard: 0 }[options.difficulty];
+    const { covers, scanCharges: scans } = coverHuntConfig(options);
     return {
       ...game,
-      rules: `本局 ${covers} 处掩体，双方轮流藏身与搜索。猎手${scans ? `每轮可扫描 ${scans} 次，再选择开一枪` : "没有扫描，直接选择掩体开一枪"}；命中猎手得分，否则潜行者得分。`,
-      tutorialSteps: [game.tutorialSteps[0]!, scans ? `猎手最多扫描 ${scans} 次，再切换“锁定一枪”` : "高手局没有扫描，猎手直接选择目标", game.tutorialSteps[2]!],
-      proTip: scans ? game.proTip : "每轮只有一枪；留意对方的藏身习惯，也别让自己的选择太容易被猜中。",
+      rules: `本局 ${covers} 处掩体，双方轮流藏身与搜索。猎手每轮可扫描 ${scans} 次，再选择开一枪；命中猎手得分，否则潜行者得分。`,
+      tutorialSteps: [game.tutorialSteps[0]!, `猎手最多扫描 ${scans} 次，再切换“锁定一枪”`, game.tutorialSteps[2]!],
     };
   }
   return game;
