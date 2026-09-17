@@ -436,6 +436,7 @@ export default function RoomScreen() {
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const ownSeat = roomState.session?.seat ?? 0;
   const room = roomState.room;
+  const shouldConfirmLeave = Boolean(roomState.session && (room?.phase === "playing" || room?.phase === "reconnect_grace"));
   const retiredGame = Boolean(room && !isPlayableGameId(room.gameId));
   const showRetiredNotice = retiredGame && (!roomState.session || room?.phase === "waiting" || room?.phase === "ready");
   const stackedForLargeText = width < 520 && fontScale > 1.2;
@@ -566,17 +567,17 @@ export default function RoomScreen() {
   }, [ownSeat, room, t]);
 
   useEffect(() => {
-    if (Platform.OS !== "web" || (room?.phase !== "playing" && room?.phase !== "reconnect_grace")) return;
+    if (Platform.OS !== "web" || !shouldConfirmLeave) return;
     const warnBeforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = "";
     };
     globalThis.addEventListener("beforeunload", warnBeforeUnload);
     return () => globalThis.removeEventListener("beforeunload", warnBeforeUnload);
-  }, [room?.phase]);
+  }, [shouldConfirmLeave]);
 
   useEffect(() => {
-    if (room?.phase !== "playing" && room?.phase !== "reconnect_grace") return;
+    if (!shouldConfirmLeave) return;
     return navigation.addListener("beforeRemove", (event) => {
       if (allowNavigationRef.current) return;
       event.preventDefault();
@@ -587,7 +588,7 @@ export default function RoomScreen() {
       }
       setConfirmingLeave(true);
     });
-  }, [code, navigation, room?.phase]);
+  }, [code, navigation, shouldConfirmLeave]);
 
   const connectionLabel = useMemo(() => {
     if (roomState.status === "connected") return roomState.actionSyncStatus === "slow" ? "网络响应较慢" : "已连接";
@@ -648,7 +649,7 @@ export default function RoomScreen() {
   }
 
   function requestLeave() {
-    if (room?.phase === "playing" || room?.phase === "reconnect_grace") {
+    if (shouldConfirmLeave) {
       setConfirmingLeave(true);
       return;
     }
@@ -699,7 +700,7 @@ export default function RoomScreen() {
   return (
     <Screen scrollRef={roomScreenRef} scrollResetKey={room?.phase ?? null}
       scrollResetOffset={width < 600 && focusGameBoard && room?.phase === "playing" ? gameTop : 0}>
-      <Stack.Screen options={{ gestureEnabled: room?.phase !== "playing" && room?.phase !== "reconnect_grace", title: `${t(gameInfo?.title ?? "双人游戏")} · ${code}` }} />
+      <Stack.Screen options={{ gestureEnabled: !shouldConfirmLeave, title: `${t(gameInfo?.title ?? "双人游戏")} · ${code}` }} />
       <View style={styles.nav}>
         <Brand compact iconOnly={width < 440 || fontScale > 1.2} />
         <View style={styles.navRight}>
@@ -708,7 +709,7 @@ export default function RoomScreen() {
             <Text style={styles.connectionText}>{connectionLabel}</Text>
           </View>
           {room && (
-            <Button accessibilityHint={room.phase === "playing" ? "会先询问是否暂时离开当前对局" : undefined} onPress={requestLeave} style={styles.exitButton} variant="ghost">{roomState.session ? "离开" : "返回"}</Button>
+            <Button accessibilityHint={shouldConfirmLeave ? "会先询问是否暂时离开当前对局" : undefined} onPress={requestLeave} style={styles.exitButton} variant="ghost">{roomState.session ? "离开" : "返回"}</Button>
           )}
         </View>
       </View>
