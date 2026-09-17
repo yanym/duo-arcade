@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { Text } from "@/components/ScaledText";
 import { useI18n } from "@/i18n";
 
@@ -215,6 +215,9 @@ function optionEffect(game: GameInfo, options: GameOptions): string {
 
 export function GameOptionsPanel({ game, options, onChange }: Props) {
   const { language, t } = useI18n();
+  const { width, fontScale } = useWindowDimensions();
+  const largeText = fontScale > 1.2;
+  const stackedLabels = width < 600 || largeText;
   return (
     <View style={styles.panel}>
       <View style={styles.headingRow}>
@@ -225,9 +228,9 @@ export function GameOptionsPanel({ game, options, onChange }: Props) {
         <Text style={styles.effect}>{optionEffect(game, options)}</Text>
       </View>
       {rows.filter((row) => game.optionKeys.includes(row.key)).map((row) => (
-        <View key={row.key} style={styles.row}>
-          <Text style={[styles.label, language === "en" && styles.labelEnglish]}>{row.label}</Text>
-          <View style={styles.segments}>
+        <View key={row.key} style={[styles.row, stackedLabels && styles.rowStacked]}>
+          <Text style={[styles.label, language === "en" && styles.labelEnglish, stackedLabels && styles.labelStacked]}>{row.label}</Text>
+          <View style={[styles.segments, stackedLabels && styles.segmentsFullWidth, largeText && styles.segmentsLargeText]}>
             {row.choices.map((choice) => {
               const selected = options[row.key] === choice.value;
               return (
@@ -238,7 +241,7 @@ export function GameOptionsPanel({ game, options, onChange }: Props) {
                   aria-pressed={selected}
                   key={choice.value}
                   onPress={() => onChange({ ...options, [row.key]: choice.value })}
-                  style={({ pressed }) => [styles.segment, selected && styles.segmentActive, pressed && styles.pressed]}
+                  style={({ pressed }) => [styles.segment, largeText && styles.segmentLargeText, selected && styles.segmentActive, pressed && styles.pressed]}
                 >
                   <Text style={[styles.segmentText, selected && styles.segmentTextActive]}>{choice.label}</Text>
                 </Pressable>
@@ -258,12 +261,17 @@ const styles = StyleSheet.create({
   title: { color: colors.ink, fontSize: 18, fontWeight: "900", marginTop: 3 },
   effect: { color: colors.muted, fontSize: 12, fontWeight: "700" },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 14, marginTop: 10 },
+  rowStacked: { flexDirection: "column", alignItems: "stretch", gap: 8 },
   label: { color: colors.ink, fontSize: 14, fontWeight: "800", width: 40 },
   labelEnglish: { width: 68, fontSize: 12 },
-  segments: { flex: 1, flexDirection: "row", borderRadius: radii.small, backgroundColor: colors.canvas, padding: 3 },
-  segment: { flex: 1, minHeight: 44, borderRadius: 8, alignItems: "center", justifyContent: "center", paddingHorizontal: 8 },
+  labelStacked: { width: "auto" },
+  segments: { flexGrow: 1, flexShrink: 1, flexBasis: 0, flexDirection: "row", borderRadius: radii.small, backgroundColor: colors.canvas, padding: 3 },
+  segmentsFullWidth: { flexGrow: 0, flexShrink: 0, flexBasis: "auto", width: "100%" },
+  segmentsLargeText: { flexDirection: "column", gap: 3 },
+  segment: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, minHeight: 44, borderRadius: 8, alignItems: "center", justifyContent: "center", paddingHorizontal: 6, paddingVertical: 10 },
+  segmentLargeText: { flexGrow: 0, flexShrink: 0, flexBasis: "auto" },
   segmentActive: { backgroundColor: colors.primary },
-  segmentText: { color: colors.muted, fontSize: 14, fontWeight: "800" },
+  segmentText: { color: colors.muted, fontSize: 14, fontWeight: "800", textAlign: "center", maxWidth: "100%" },
   segmentTextActive: { color: colors.surface },
   pressed: { opacity: 0.78 },
 });
