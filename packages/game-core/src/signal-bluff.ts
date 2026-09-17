@@ -18,7 +18,7 @@ type BluffConfig = Pick<
   "totalRounds" | "signalCount" | "claimDurationMs" | "judgeDurationMs"
 > & { scanCharges: number };
 
-function bluffConfig(options: GameOptions): BluffConfig {
+export function signalBluffConfig(options: GameOptions): BluffConfig {
   const difficulty = {
     easy: { signalCount: 3 as const, scanCharges: 2 },
     standard: { signalCount: 4 as const, scanCharges: 1 },
@@ -57,7 +57,7 @@ export function createSignalBluffState(
   seed: number,
   options: GameOptions,
 ): SignalBluffState {
-  const config = bluffConfig(options);
+  const config = signalBluffConfig(options);
   const availableSignals = SIGNAL_RUNES.slice(0, config.signalCount);
   return {
     kind: "signal_bluff",

@@ -1603,6 +1603,7 @@ const UI_FRAGMENT_ENGLISH: Record<string, string> = {
 };
 
 const DYNAMIC_TRANSLATIONS: [RegExp, (...groups: string[]) => string][] = [
+  [/^(\d+) 轮 · (\d+) 种符文 · 每人整局 (\d+) 次扫描 · 谎报 (\d+) 秒\/判断 (\d+) 秒$/, (rounds, runes, scans, claim, judge) => `${rounds} rounds · ${runes} runes · ${scans} scan${scans === "1" ? "" : "s"} each per match · claim ${claim}s / judge ${judge}s`],
   [/^扫描 · (\d+)$/, (count) => `Scan · ${count}`],
   [/^本局攻防已结束(?: · (.+))?$/, (outcome) => `Cover Hunt complete${outcome ? ` · ${translate(outcome, "en")}` : ""}`],
   [/^本局 (\d+) 处掩体，双方轮流藏身与搜索。猎手每轮可扫描 (\d+) 次，再选择开一枪；命中猎手得分，否则潜行者得分。$/, (covers, scans) => `${covers} cover spots. Take turns hiding and hunting. The hunter gets up to ${scans} scan${scans === "1" ? "" : "s"} and one shot per round. A hit scores for the hunter; a miss scores for the hider.`],

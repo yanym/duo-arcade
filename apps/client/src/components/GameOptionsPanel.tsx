@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "@/components/ScaledText";
 import { useI18n } from "@/i18n";
 
-import { coverHuntConfig, emberCrewConfig, type GameOptions } from "@duo/game-core";
+import { coverHuntConfig, emberCrewConfig, signalBluffConfig, type GameOptions } from "@duo/game-core";
 
 import type { GameInfo } from "@/lib/games";
 import { colors, radii } from "@/theme";
@@ -171,12 +171,8 @@ function optionEffect(game: GameInfo, options: GameOptions): string {
     return `${rounds} 段赛道 · ${moves} 种动作 · ${lives} 点护盾 · ${countdown} 秒随机预备 · ${window} 秒反应窗`;
   }
   if (game.id === "signal_bluff") {
-    const rounds = options.length === "short" ? 5 : options.length === "long" ? 9 : 7;
-    const runes = options.difficulty === "easy" ? 3 : options.difficulty === "hard" ? 5 : 4;
-    const scans = options.difficulty === "easy" ? 2 : options.difficulty === "hard" ? 0 : 1;
-    const claim = options.pace === "relaxed" ? 30 : options.pace === "blitz" ? 12 : 20;
-    const judge = options.pace === "relaxed" ? 20 : options.pace === "blitz" ? 9 : 14;
-    return `${rounds} 轮 · ${runes} 种符文 · 每人 ${scans} 次扫描 · 谎报 ${claim} 秒/判断 ${judge} 秒`;
+    const { totalRounds: rounds, signalCount: runes, scanCharges: scans, claimDurationMs, judgeDurationMs } = signalBluffConfig(options);
+    return `${rounds} 轮 · ${runes} 种符文 · 每人整局 ${scans} 次扫描 · 谎报 ${claimDurationMs / 1000} 秒/判断 ${judgeDurationMs / 1000} 秒`;
   }
   if (game.id === "prism_heist") {
     const corridors = options.length === "short" ? 4 : options.length === "long" ? 8 : 6;
