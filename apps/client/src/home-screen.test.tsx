@@ -92,6 +92,9 @@ describe("English home and solo entry", () => {
     expect(screen.getByRole("button", { name: "Create Gomoku room" })).toBeTruthy();
     expect(screen.getByRole("textbox", { name: "Six-character room code" })).toBeTruthy();
     expect(screen.getByRole("radiogroup", { name: "PLAY MODE" })).toBeTruthy();
+    const headingStyle = getComputedStyle(screen.getByRole("heading", { name: "What would you like to play?" }).parentElement!);
+    expect(headingStyle.maxWidth).toBe("100%");
+    expect(headingStyle.flexShrink).toBe("1");
   });
 
   it("keeps the journey overview when a tablet has room for it", async () => {

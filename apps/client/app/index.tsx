@@ -380,7 +380,7 @@ export default function HomeScreen() {
       </View>
 
       <View onLayout={(event) => { catalogYRef.current = event.nativeEvent.layout.y; }} style={styles.sectionHeader}>
-        <View>
+        <View style={styles.sectionHeading}>
           <Text style={styles.sectionKicker}>游戏大厅</Text>
           <Text accessibilityRole="header" aria-level={2} style={styles.sectionTitle}>今天想怎么玩？</Text>
         </View>
@@ -492,6 +492,7 @@ const styles = StyleSheet.create({
   aiSummaryAction: { color: colors.primaryDark, fontSize: 12, fontWeight: "900" },
   error: { color: colors.danger, fontSize: 13, marginTop: 12 },
   sectionHeader: { flexDirection: "row", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 20, marginBottom: 20 },
+  sectionHeading: { flexShrink: 1, maxWidth: "100%" },
   sectionKicker: { color: colors.coralInk, fontSize: 12, fontWeight: "900", letterSpacing: 1 },
   sectionTitle: { color: colors.ink, fontSize: 28, fontWeight: "900", marginTop: 5 },
   sectionMeta: { color: colors.muted, fontSize: 13 },
