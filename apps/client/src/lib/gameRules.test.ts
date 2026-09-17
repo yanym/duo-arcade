@@ -42,6 +42,25 @@ describe("configured room instructions", () => {
     expect(GAME_INFO.gomoku.rules).toBe(original);
   });
   for (const difficulty of ["easy", "standard", "hard"] as const) {
+    it(`only teaches available ${difficulty} Pulse Pass actions and match-long resources`, () => {
+      const options = { ...DEFAULT_GAME_OPTIONS, difficulty };
+      const state = createGameState("pulse_pass", 0, 1000, 123, options);
+      if (state.kind !== "pulse_pass") throw new Error("Unexpected game");
+      const info = getConfiguredGameInfo("pulse_pass", options);
+      const english = translate(info.rules, "en");
+      expect(english).toContain(state.availablePowers.map((power) => `+${power}`).join(", "));
+      expect(english).toContain("scores for your opponent");
+      if (state.initialVentCharges === 0) {
+        expect(english).toContain("No vents at this difficulty");
+        expect(translate(info.tutorialSteps[2]!, "en")).toBe("No vents at this difficulty");
+        expect(translate(info.proTip, "en")).not.toMatch(/vent/i);
+      } else {
+        expect(english).toContain(`Each player has ${state.initialVentCharges} vent`);
+        expect(english).toContain("for the whole match");
+        expect(english).toContain("lowers charge by 2");
+      }
+      if (difficulty === "easy") expect([english, ...info.tutorialSteps.map((step) => translate(step, "en"))].join(" ")).not.toMatch(/Overload|overload|\+3/);
+    });
     it(`describes ${difficulty} orbital rings accurately`, () => {
       const options = { ...DEFAULT_GAME_OPTIONS, difficulty };
       const state = createGameState("orbital_repair", 0, 1000, 123, options);

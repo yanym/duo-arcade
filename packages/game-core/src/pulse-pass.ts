@@ -12,7 +12,7 @@ import {
 
 const ROUND_RESULT_DURATION_MS = 1_800;
 
-function passConfig(options: GameOptions): Pick<
+export function pulsePassConfig(options: GameOptions): Pick<
   PulsePassState,
   "totalRounds" | "availablePowers" | "initialVentCharges" | "turnDurationMs" | "burstMin" | "burstMax"
 > {
@@ -51,7 +51,7 @@ export function createPulsePassState(
   seed: number,
   options: GameOptions,
 ): PulsePassState {
-  const config = passConfig(options);
+  const config = pulsePassConfig(options);
   const burstAt = thresholdFor(seed, 1, config.burstMin, config.burstMax);
   return {
     kind: "pulse_pass",

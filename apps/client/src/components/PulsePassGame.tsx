@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, View, useWindowDimensions } from "react-native";
 import { Text } from "@/components/ScaledText";
 
 import { useI18n } from "@/i18n";
@@ -41,6 +41,8 @@ export const PulsePassGame = memo(function PulsePassGame({
 }: Props) {
   const { language, t } = useI18n();
   const { feedback, playSound, settings } = useSettings();
+  const { width } = useWindowDimensions();
+  const isNarrow = width < 380;
   const eventRef = useRef("");
   const ended = Boolean(game.result) || phase === "completed";
   const paused = !ended && phase !== "playing";
@@ -51,6 +53,7 @@ export const PulsePassGame = memo(function PulsePassGame({
   const eventKey = `${game.round}:${game.phase}:${game.totalPasses}:${game.scores.join("-")}`;
   const heat = heatCopy[game.heatBand];
   const ventsLeft = game.ventCharges[ownSeat];
+  const hasVents = game.initialVentCharges > 0;
   const roundOver = game.phase === "round_result" || ended;
 
   useEffect(() => {
@@ -107,7 +110,7 @@ export const PulsePassGame = memo(function PulsePassGame({
         {[0, 1].map((seat) => (
           <View key={seat} style={[styles.scoreCard, seat === 1 && styles.scoreCoral, seat === ownSeat && styles.scoreOwn]}>
             <View style={styles.scoreTop}><Text style={styles.scoreName}>{seat === ownSeat ? "你" : "对手"} · {seat === 0 ? "靛蓝" : "珊瑚"}</Text><Text style={styles.scoreValue}>{game.scores[seat as Seat]}</Text></View>
-            <Text style={styles.scoreMeta}>冷却 {game.ventCharges[seat as Seat]}/{game.initialVentCharges} · 总注入 {game.totalPower[seat as Seat]}</Text>
+            <Text style={styles.scoreMeta}>{hasVents && <>{t("冷却")} {game.ventCharges[seat as Seat]}/{game.initialVentCharges} · </>}{t("总注入")} {game.totalPower[seat as Seat]}</Text>
           </View>
         ))}
       </View>
@@ -117,18 +120,18 @@ export const PulsePassGame = memo(function PulsePassGame({
         <Text style={styles.statusMeta}>{statusMeta}</Text>
       </View>
 
-      <View style={[styles.reactor, game.heatBand === "critical" && styles.reactorCritical]}>
+      <View style={[styles.reactor, isNarrow && styles.reactorNarrow, game.heatBand === "critical" && styles.reactorCritical]}>
         <View style={[styles.orbitOuter, { pointerEvents: "none" }]}><View style={styles.orbitInner} /></View>
-        <View style={[styles.core, game.heatBand === "warm" && styles.coreWarm, game.heatBand === "critical" && styles.coreCritical]}>
+        <View style={[styles.core, isNarrow && styles.coreNarrow, game.heatBand === "warm" && styles.coreWarm, game.heatBand === "critical" && styles.coreCritical]}>
           <Text style={styles.coreGlyph}>{heat.glyph}</Text>
           <Text style={styles.coreValue}>{game.charge}</Text>
           <Text style={styles.coreUnit}>公开电荷</Text>
         </View>
-        <View style={styles.reactorInfo}>
-          <View style={styles.heatPanel}>
+        <View style={[styles.reactorInfo, isNarrow && styles.reactorInfoNarrow]}>
+          <View style={[styles.heatPanel, isNarrow && styles.heatPanelNarrow]}>
             <Text style={styles.heatLabel}>传感器状态</Text>
             <Text style={styles.heatValue}>{heat.title}</Text>
-            {!roundOver && <Text style={styles.heatDetail}>{heat.detail}</Text>}
+            {!roundOver && !isNarrow && <Text style={styles.heatDetail}>{heat.detail}</Text>}
           </View>
           <View style={styles.holderChip}>
             <Text style={styles.holderLabel}>{roundOver ? "本轮结果" : "当前持有"}</Text>
@@ -156,9 +159,9 @@ export const PulsePassGame = memo(function PulsePassGame({
               </Pressable>
             ))}
           </View>
-          <Pressable accessibilityHint={t("消耗整局一次冷却，将公开电荷降低 2 并把核心传给对手")} accessibilityLabel={t(`紧急冷却，剩余 ${game.ventCharges[ownSeat]} 次`)} accessibilityRole="button" accessibilityState={{ disabled: !canAct || game.ventCharges[ownSeat] <= 0 }} disabled={!canAct || game.ventCharges[ownSeat] <= 0} onPress={vent} style={({ pressed }) => [styles.ventButton, (!canAct || game.ventCharges[ownSeat] <= 0) && styles.disabled, pressed && !settings.reducedMotion && styles.pressed]}>
-            <Text style={styles.ventGlyph}>❄</Text><View style={styles.ventCopy}><Text style={styles.ventTitle}>紧急冷却 · 电荷 −2</Text><Text style={styles.ventDetail}>{game.initialVentCharges === 0 ? "本局难度不提供冷却" : ventsLeft === 0 ? "本局冷却已用完，下局恢复" : `整局剩余 ${ventsLeft} 次 · 冷却后传给对手`}</Text></View>
-          </Pressable>
+          {hasVents && <Pressable accessibilityHint={t("消耗整局一次冷却，将公开电荷降低 2 并把核心传给对手")} accessibilityLabel={t(`紧急冷却，剩余 ${game.ventCharges[ownSeat]} 次`)} accessibilityRole="button" accessibilityState={{ disabled: !canAct || game.ventCharges[ownSeat] <= 0 }} disabled={!canAct || game.ventCharges[ownSeat] <= 0} onPress={vent} style={({ pressed }) => [styles.ventButton, (!canAct || game.ventCharges[ownSeat] <= 0) && styles.disabled, pressed && !settings.reducedMotion && styles.pressed]}>
+            <Text style={styles.ventGlyph}>❄</Text><View style={styles.ventCopy}><Text style={styles.ventTitle}>紧急冷却 · 电荷 −2</Text><Text style={styles.ventDetail}>{ventsLeft === 0 ? "本局冷却已用完，下局恢复" : `整局剩余 ${ventsLeft} 次 · 冷却后传给对手`}</Text></View>
+          </Pressable>}
         </>
       ) : (
         <View style={[styles.resultCard, game.roundWinner === ownSeat && styles.resultWon]}>
@@ -170,7 +173,7 @@ export const PulsePassGame = memo(function PulsePassGame({
         </View>
       )}
 
-      {!roundOver && <View style={styles.privacyBar}><Text style={styles.privacyGlyph}>◇</Text><Text style={styles.privacyText}>每轮爆点重新生成；冷却次数整局共用，不会每轮补充。</Text></View>}
+      {!roundOver && <View style={styles.privacyBar}><Text style={styles.privacyGlyph}>◇</Text><Text style={styles.privacyText}>{hasVents ? "每轮爆点重新生成；冷却次数整局共用，不会每轮补充。" : "每轮爆点重新生成；本局难度不提供冷却。"}</Text></View>}
     </View>
   );
 });
@@ -198,17 +201,21 @@ const styles = createGameStyles({
   statusTitle: { color: "#FFF9EC", fontSize: 15, fontWeight: "900", textAlign: "center" },
   statusMeta: { color: "#A8BFC2", fontSize: 8, fontWeight: "800", marginTop: 3, textAlign: "center" },
   reactor: { alignItems: "center", gap: 12, backgroundColor: "#030E10", borderRadius: radii.medium, borderWidth: 1, borderColor: "#235057", marginTop: 6, padding: 12, overflow: "hidden" },
+  reactorNarrow: { flexDirection: "row", gap: 10, padding: 10 },
   reactorCritical: { borderColor: "#C84962", backgroundColor: "#160B10" },
   orbitOuter: { position: "absolute", width: 205, height: 205, borderRadius: 103, borderWidth: 1, borderColor: "#1F4A50", alignItems: "center", justifyContent: "center" },
   orbitInner: { width: 154, height: 154, borderRadius: 77, borderWidth: 1, borderColor: "#24565B" },
   core: { width: 104, height: 104, borderRadius: 52, alignItems: "center", justifyContent: "center", backgroundColor: "#174D49", borderWidth: 3, borderColor: "#6AD8C4", shadowColor: "#5DE0C8", shadowOpacity: 0.46, shadowRadius: 16, elevation: 6 },
+  coreNarrow: { width: 88, height: 88, borderRadius: 44, flexShrink: 0 },
   coreWarm: { backgroundColor: "#604822", borderColor: "#F1CF71", shadowColor: "#F2C34E" },
   coreCritical: { backgroundColor: "#722B3D", borderColor: "#FF879C", shadowColor: "#FF5879" },
   coreGlyph: { color: "#FFF0B7", fontSize: 15, fontWeight: "900" },
   coreValue: { color: "#FFFFFF", fontSize: 31, lineHeight: 34, fontWeight: "900", fontVariant: ["tabular-nums"] },
   coreUnit: { color: "#BCD5D1", fontSize: 6, fontWeight: "900" },
   reactorInfo: { width: "100%", flexDirection: "row", alignItems: "flex-start", flexWrap: "wrap", gap: 10 },
+  reactorInfoNarrow: { width: "auto", flex: 1, minWidth: 0, flexDirection: "column", gap: 6 },
   heatPanel: { flex: 1, minWidth: 125 },
+  heatPanelNarrow: { minWidth: 0 },
   heatLabel: { color: "#63868A", fontSize: 6, fontWeight: "900" },
   heatValue: { color: "#FFF0B8", fontSize: 13, fontWeight: "900", marginTop: 2 },
   heatDetail: { color: "#A8BFC2", fontSize: 7, lineHeight: 11, fontWeight: "800", marginTop: 2 },

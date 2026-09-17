@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { createGameState, PLAYABLE_GAME_IDS, type Seat } from "@duo/game-core";
+import { createGameState, DEFAULT_GAME_OPTIONS, PLAYABLE_GAME_IDS, type Seat } from "@duo/game-core";
 import { phaseHint } from "./phaseHint";
+import { translate } from "../i18n";
 
 describe("room lifecycle guidance", () => {
+  it("does not tell expert Pulse players to budget resources that do not exist", () => {
+    const game = createGameState("pulse_pass", 0, 1000, 42, { ...DEFAULT_GAME_OPTIONS, difficulty: "hard" });
+    const hint = translate(phaseHint({ gameId: "pulse_pass", game, phase: "playing", mode: "duo", rematchVotes: [] }, 0), "en");
+    expect(hint).toContain("No vents at this difficulty");
+    expect(hint).not.toContain("limited for the whole match");
+  });
   for (const gameId of PLAYABLE_GAME_IDS) {
     const room: Parameters<typeof phaseHint>[0] = { gameId, game: createGameState(gameId, 0, 1000, 42), phase: "completed", mode: "duo", rematchVotes: [] };
     for (const ownSeat of [0, 1] as Seat[]) {

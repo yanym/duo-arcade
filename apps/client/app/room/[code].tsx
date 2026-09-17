@@ -681,8 +681,8 @@ export default function RoomScreen() {
     roomState.join(joinNickname);
   }
 
-  const focusGameBoard = room?.game.kind === "neon_dash" || room?.game.kind === "meteor_dash" || room?.game.kind === "nova_volley" || room?.game.kind === "signal_bluff" || room?.game.kind === "cover_hunt" || room?.game.kind === "quantum_duel";
-  const compactGameShell = focusGameBoard || room?.game.kind === "ember_crew" || room?.game.kind === "pulse_pass";
+  const focusGameBoard = room?.game.kind === "neon_dash" || room?.game.kind === "meteor_dash" || room?.game.kind === "nova_volley" || room?.game.kind === "signal_bluff" || room?.game.kind === "cover_hunt" || room?.game.kind === "quantum_duel" || room?.game.kind === "ember_crew" || room?.game.kind === "pulse_pass";
+  const compactGameShell = focusGameBoard;
 
   if (!ROOM_CODE_PATTERN.test(code)) {
     return (

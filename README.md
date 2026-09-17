@@ -6,19 +6,19 @@ Duo Arcade is a polished, no-sign-up arcade for Web and iPhone. Create a private
 
 [Play the current web release](https://duo-arcade.yimgyan.workers.dev)
 
-The working branch contains a curated game-library update that has not yet been deployed. The live web release may still show the previous library. Native cross-platform acceptance and release packaging remain in progress.
+The live Web release contains the curated ten-game library. Native cross-platform acceptance remains in progress; the locally exported iOS build has not completed App Store upload.
 
 ## Version 1.0
 
 - iOS marketing version: `1.0`
-- iOS build: `1`
+- iOS build: `2`
 - Workspace packages: `1.0.0`
 - Realtime service release: `1.0`
 - Shared network protocol: `28` (version 27 remains supported for games it understands; Ember Crew requires version 28)
 
 ## What is included
 
-- 10 playable games in the current working catalog, including the new cooperative Ember Crew
+- 10 playable games, including the cooperative Ember Crew
 - Friend rooms and instant solo play with adaptive AI
 - Cross-platform play between Web and iPhone
 - Private room codes with no account required
@@ -127,3 +127,5 @@ For local native development, `pnpm --filter @duo/client ios:native` generates t
 Native acceptance must use a normally signed Simulator build, not `CODE_SIGNING_ALLOWED=NO`. A linker-only Simulator executable can launch while lacking the application-identifier entitlement needed by SecureStore; this produced keychain error `-34018` and launch-only room/preferences storage in local testing. Xcode's normal ad-hoc Simulator signing supplies the simulated application identifier. This is separate from distribution signing and does not produce an App Store archive. Native-to-Web rescue and background/foreground recovery have been exercised. The normally signed build now also preserves language, reduced motion, room credentials and a three-stone Gomoku position across process termination/relaunch. A native fractional-width grid-wrapping defect was repaired and verified by coordinate taps and a complete nine-move Web–iOS Gomoku match. The remaining native game matrix, broader touch ergonomics and large-text acceptance are still in progress.
 
 Further native–Web playthroughs completed Reversi (60 moves and four automatic passes), Cover Hunt (both roles, scans and shots), and Quantum Duel (all moves, hidden choices and a tied match). Cover Hunt's cropped native arena and the off-screen Quantum Duel controls were repaired and checked in actual Simulator play. Small-screen home layouts now prioritize creating or joining a room, and game cards retain only the useful selected-state badge. Web screenshots were reviewed at 320×740, 390×844 and 1024×1366; this does not replace remaining iOS device and large-text acceptance.
+
+Pulse Pass instructions now match each room's available charges and match-long vent budget. Expert games do not present an unusable vent control. Its compact phone reactor preserves charge, heat and holder information while keeping all three charge buttons visible at 320×740. Two complete three-round Web matches verified synchronized results and replay; the second also used direct narrow-screen coordinate taps. Ember Crew and Pulse Pass enter the existing mobile game-focus view when play starts, without changing game rules or scrolling on every action.

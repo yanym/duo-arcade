@@ -5,12 +5,27 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { advancePulsePassClock, chargePulseCore, createPulsePassState, getPulsePassView, DEFAULT_GAME_OPTIONS, type PulsePassState } from "@duo/game-core";
 import { LanguageContext } from "@/i18n";
 import { PulsePassGame } from "./PulsePassGame";
-const { playSound } = vi.hoisted(() => ({ playSound: vi.fn() }));
-vi.mock("react-native", () => vi.importActual<typeof import("react-native")>("react-native-web"));
+const { playSound, viewport } = vi.hoisted(() => ({ playSound: vi.fn(), viewport: { width: 1024, height: 768, scale: 1, fontScale: 1 } }));
+vi.mock("react-native", async () => ({
+  ...await vi.importActual<typeof import("react-native")>("react-native-web"),
+  useWindowDimensions: () => viewport,
+}));
 vi.mock("@/settings/SettingsContext", () => ({ useSettings: () => ({ feedback: vi.fn(), playSound, settings: { highContrast: false, reducedMotion: true } }) }));
-afterEach(() => { cleanup(); vi.clearAllMocks(); });
+afterEach(() => { cleanup(); vi.clearAllMocks(); viewport.width = 1024; });
 
 describe("pulse pass hidden threshold", () => {
+  it.each([320, 375])("keeps charge, heat, holder and full-size controls in a compact reactor at %s px", (width) => {
+    viewport.width = width;
+    const state = createPulsePassState(0, 1000, 42, { ...DEFAULT_GAME_OPTIONS, difficulty: "hard" });
+    render(<LanguageContext.Provider value="en"><PulsePassGame game={getPulsePassView(state)} ownSeat={0} phase="playing" now={1001} onCharge={vi.fn()} onVent={vi.fn()} /></LanguageContext.Provider>);
+    const core = screen.getByText("Public charge").parentElement!;
+    expect(getComputedStyle(core).width).toBe("88px");
+    expect(getComputedStyle(core.parentElement!).flexDirection).toBe("row");
+    expect(screen.getByText("Stable")).toBeTruthy();
+    expect(screen.getByText("You · 0 passes")).toBeTruthy();
+    expect(screen.queryByText("The core appears stable, but the burst point remains hidden")).toBeNull();
+    for (const button of screen.getAllByRole("button")) expect(Number.parseFloat(getComputedStyle(button).minHeight)).toBeGreaterThanOrEqual(44);
+  });
   it("does not describe a warming core as an immediate burst risk", () => {
     let state = createPulsePassState(0, 1000, 42, DEFAULT_GAME_OPTIONS);
     while (state.heatBand === "stable") {
@@ -37,11 +52,26 @@ describe("pulse pass hidden threshold", () => {
     expect(screen.queryByText("核心在你手中：选择充能强度或紧急冷却")).toBeNull();
   });
 
-  it("explains unavailable vents in hard mode without implying they were spent", () => {
+  it("explains expert rules without presenting an unavailable vent as a control or resource", () => {
     const state = createPulsePassState(0, 1000, 42, { ...DEFAULT_GAME_OPTIONS, difficulty: "hard" });
     render(<LanguageContext.Provider value="en"><PulsePassGame game={getPulsePassView(state)} ownSeat={0} phase="playing" now={1001} onCharge={vi.fn()} onVent={vi.fn()} /></LanguageContext.Provider>);
-    expect(screen.getByText("No vents at this difficulty")).toBeTruthy();
+    expect(screen.getByText("New burst point each round · No vents at this difficulty")).toBeTruthy();
     expect(screen.getByText("You hold the core — choose a charge")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Emergency vent/ })).toBeNull();
+    expect(screen.queryByText(/Vents 0\/0/)).toBeNull();
+    expect(screen.queryByText(/Vents must last the whole match/)).toBeNull();
+    expect(screen.getAllByRole("button")).toHaveLength(3);
+  });
+
+  it("retains the available easy-mode vent and only its two legal charge controls", () => {
+    const state = createPulsePassState(0, 1000, 42, { ...DEFAULT_GAME_OPTIONS, difficulty: "easy" });
+    const onVent = vi.fn();
+    render(<LanguageContext.Provider value="en"><PulsePassGame game={getPulsePassView(state)} ownSeat={0} phase="playing" now={1001} onCharge={vi.fn()} onVent={onVent} /></LanguageContext.Provider>);
+    expect(screen.getAllByRole("button")).toHaveLength(3);
+    expect(screen.queryByRole("button", { name: /Overload/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Emergency vent · 2 remaining" }));
+    expect(onVent).toHaveBeenCalledOnce();
+    expect(screen.getAllByText("Vents 2/2 · Total charge 0")).toHaveLength(2);
   });
 
   it("replaces live risk guidance after a timeout", () => {

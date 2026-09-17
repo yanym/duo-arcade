@@ -1,4 +1,4 @@
-import { coverHuntConfig, isPlayableGameId, roundsForLength, turnDurationForPace, type GameId, type GameOptions } from "@duo/game-core";
+import { coverHuntConfig, isPlayableGameId, pulsePassConfig, roundsForLength, turnDurationForPace, type GameId, type GameOptions } from "@duo/game-core";
 
 export type GameInfo = {
   id: GameId;
@@ -430,6 +430,16 @@ export function getConfiguredGameInfo(gameId: GameId, options: GameOptions): Gam
       ...game,
       rules: `本局 ${covers} 处掩体，双方轮流藏身与搜索。猎手每轮可扫描 ${scans} 次，再选择开一枪；命中猎手得分，否则潜行者得分。`,
       tutorialSteps: [game.tutorialSteps[0]!, `猎手最多扫描 ${scans} 次，再切换“锁定一枪”`, game.tutorialSteps[2]!],
+    };
+  }
+  if (gameId === "pulse_pass") {
+    const { availablePowers, initialVentCharges } = pulsePassConfig(options);
+    const ventRule = initialVentCharges === 0 ? "本局难度不提供冷却" : `每人整局可冷却 ${initialVentCharges} 次，每次降低 2 点电荷并传出。`;
+    return {
+      ...game,
+      rules: `本局可充能 ${availablePowers.join("/")} 点；达到隐藏爆点或持有超时，对手得分。${ventRule}`,
+      tutorialSteps: ["选择本局可用的充能档位，立即传给对手；加到爆点会在你手中爆裂。", game.tutorialSteps[1]!, ventRule],
+      proTip: initialVentCharges === 0 ? "根据公开电荷、爆点范围和热度选择风险；轻推也不保证安全。" : game.proTip,
     };
   }
   return game;

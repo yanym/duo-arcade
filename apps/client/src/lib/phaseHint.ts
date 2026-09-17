@@ -31,7 +31,9 @@ export function phaseHint(room: Pick<RoomView, "gameId" | "game" | "phase" | "mo
   if (room.game.kind === "signal_bluff") return "真相只向发报员显示，扫描分组只向审查员显示；相信真话或质疑谎报都能得分，每轮自动换岗";
   if (room.game.kind === "prism_heist") return "安全航道只向侦察员显示；驾驶员先换道，窗口开启后两人分别旁路和冲刺，每段交换岗位";
   if (room.game.kind === "nova_volley") return "只有接球方能移动挡板；对准公开来球后，在服务器击球窗内选择回球轨道。连拍逐步加速，错位或超时直接失分";
-  if (room.game.kind === "pulse_pass") return "精确爆点对双方保密；持有者选择充能档位后立刻传出，达到阈值或持有超时都会让对手得分。冷却次数贯穿整局";
+  if (room.game.kind === "pulse_pass") return room.game.initialVentCharges === 0
+    ? "精确爆点对双方保密；达到爆点或持有超时，对手得分。本局难度不提供冷却。"
+    : "精确爆点对双方保密；持有者选择充能档位后立刻传出，达到阈值或持有超时都会让对手得分。冷却次数贯穿整局";
   if (room.game.kind === "drop_rescue") return "航道与侧风只向领航员显示，速度与安全值只向制动员显示；两项控制分别锁定后由服务器结算，每个救援点交换岗位";
   if (room.game.kind === "quantum_duel") return "突击克蓄能、蓄能克防御、防御克突击；双方选择互相保密";
   if (room.game.kind === "starway_escort") return "驾驶员和护盾员各自只看一半情报，每航段交换角色";
