@@ -42,9 +42,7 @@ export function GameCard({
       <View style={styles.copy}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>{title}</Text>
-          <Text style={[styles.badge, selected ? styles.liveBadge : styles.soonBadge]}>
-            {selected ? "已选择" : "可玩"}
-          </Text>
+          {selected && <Text style={[styles.badge, styles.liveBadge]}>已选择</Text>}
         </View>
         <Text style={styles.description}>{description}</Text>
         <Text style={styles.meta}>{meta}</Text>
@@ -82,10 +80,9 @@ const styles = StyleSheet.create({
   iconText: { fontSize: 21, fontWeight: "800" },
   copy: { flex: 1 },
   titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
-  title: { color: colors.ink, fontSize: 19, fontWeight: "900" },
-  badge: { overflow: "hidden", paddingHorizontal: 9, paddingVertical: 4, borderRadius: radii.pill, fontSize: 11, fontWeight: "800" },
+  title: { flex: 1, minWidth: 0, color: colors.ink, fontSize: 19, fontWeight: "900" },
+  badge: { flexShrink: 0, overflow: "hidden", paddingHorizontal: 9, paddingVertical: 4, borderRadius: radii.pill, fontSize: 11, fontWeight: "800" },
   liveBadge: { color: colors.primaryDark, backgroundColor: colors.primarySoft },
-  soonBadge: { color: colors.muted, backgroundColor: colors.canvas },
   description: { color: colors.muted, marginTop: 8, fontSize: 14, lineHeight: 20 },
   meta: { color: colors.ink, marginTop: 12, fontSize: 12, fontWeight: "700" }
 });

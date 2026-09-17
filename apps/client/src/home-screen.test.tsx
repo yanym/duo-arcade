@@ -9,9 +9,13 @@ import HomeScreen from "../app/index";
 const mocks = vi.hoisted(() => ({
   feedback: vi.fn(),
   push: vi.fn(),
+  dimensions: { width: 1024, height: 768, scale: 1, fontScale: 1 },
 }));
 
-vi.mock("react-native", () => vi.importActual<typeof import("react-native")>("react-native-web"));
+vi.mock("react-native", async () => ({
+  ...await vi.importActual<typeof import("react-native")>("react-native-web"),
+  useWindowDimensions: () => mocks.dimensions,
+}));
 vi.mock("expo-router", () => ({
   router: { back: vi.fn(), push: mocks.push, replace: vi.fn() },
   usePathname: () => "/",
@@ -76,9 +80,27 @@ function fusedEnglishFragments(container: HTMLElement): string[] {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  mocks.dimensions = { width: 1024, height: 768, scale: 1, fontScale: 1 };
 });
 
 describe("English home and solo entry", () => {
+  it.each([[320, 568], [320, 740], [390, 844]])("prioritizes room controls over repeated steps at %s×%s", async (width, height) => {
+    mocks.dimensions = { width, height, scale: 1, fontScale: 1 };
+    render(<LanguageContext.Provider value="en"><HomeScreen /></LanguageContext.Provider>);
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "Your game nickname" })).toBeTruthy());
+    expect(screen.queryByText("① Pick a game")).toBeNull();
+    expect(screen.getByRole("button", { name: "Create Gomoku room" })).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Six-character room code" })).toBeTruthy();
+    expect(screen.getByRole("radiogroup", { name: "PLAY MODE" })).toBeTruthy();
+  });
+
+  it("keeps the journey overview when a tablet has room for it", async () => {
+    render(<LanguageContext.Provider value="en"><HomeScreen /></LanguageContext.Provider>);
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "Your game nickname" })).toBeTruthy());
+    expect(screen.getByText("① Pick a game")).toBeTruthy();
+    expect(screen.getByText("② Invite a friend")).toBeTruthy();
+  });
+
   it("keeps the full home localized and exposes the AI mode state", async () => {
     const view = render(
       <LanguageContext.Provider value="en">
@@ -98,6 +120,13 @@ describe("English home and solo entry", () => {
     expect(within(library).getByRole("radio", { name: /Ember Crew/ })).toBeTruthy();
     expect(within(library).queryByRole("radio", { name: /Split Maze|Star Trace|Fog Sonar/ })).toBeNull();
     expect(within(library).getAllByRole("radio", { checked: true })).toHaveLength(1);
+    expect(within(library).queryByText("Playable")).toBeNull();
+    expect(within(library).getAllByText("Selected")).toHaveLength(1);
+
+    fireEvent.click(within(library).getByRole("radio", { name: /Quantum Duel/ }));
+    expect(within(library).getByRole("radio", { name: /Quantum Duel/, checked: true })).toBeTruthy();
+    expect(within(library).getAllByText("Selected")).toHaveLength(1);
+    fireEvent.click(within(library).getByRole("radio", { name: /Gomoku/ }));
 
     fireEvent.click(screen.getByRole("radio", { name: "Play with AI. AI takes the other seat immediately" }));
 

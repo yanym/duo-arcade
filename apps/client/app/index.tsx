@@ -30,7 +30,7 @@ export default function HomeScreen() {
   const isWide = width >= 840;
   const isCompact = width < 380 || fontScale > 1.2;
   const compactNav = width < 480 || fontScale > 1.2;
-  const isShortNarrow = width < 380 && height < 700;
+  const isShortNarrow = width < 600 && height < 900;
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [nickname, setNickname] = useState("");
   const [roomCode, setRoomCode] = useState("");
@@ -255,7 +255,7 @@ export default function HomeScreen() {
             accessibilityHint={t("滚动到游戏大厅选择其他游戏")}
             accessibilityLabel={t(`已选择${GAME_INFO[selectedGame].title}，点按更换`)}
             accessibilityRole="button"
-            onPress={() => screenRef.current?.scrollTo({ animated: true, y: Math.max(0, catalogYRef.current - 18) })}
+            onPress={() => screenRef.current?.scrollTo({ animated: !settings.reducedMotion, y: Math.max(0, catalogYRef.current - 18) })}
             style={({ pressed }) => [styles.selectedGame, isShortNarrow && styles.selectedGameShort, pressed && styles.selectedGamePressed]}
           >
             <View style={[styles.selectedGameIcon, { backgroundColor: GAME_INFO[selectedGame].accent }]}>
