@@ -262,7 +262,15 @@ export function chooseEmberPlan(state: EmberCrewState, seat: Seat): EmberPlan {
   if (state.water[seat] > 0 && partnerPlan?.operation === "move" && state.fire[partnerPlan.cell]! > 0 && emberDistance(position, partnerPlan.cell) <= 1) {
     return { operation: "extinguish", cell: partnerPlan.cell };
   }
-  if (state.water[partner] === 0 && state.water[seat] >= 2 && emberDistance(position, state.positions[partner]) <= 1) return { operation: "share", cell: position };
+  if (state.water[partner] === 0 && state.water[seat] >= 2 && emberDistance(position, state.positions[partner]) <= 1) {
+    const partnerPosition = state.positions[partner];
+    // An escort with a fire-free exit needs to deliver, not receive the water
+    // they just gave us. Keep useful supplies and avoid spending a whole turn
+    // handing them back; still help when the partner cannot evacuate dry.
+    const safeDelivery = state.carrying[partner] && state.fire[partnerPosition] === 0
+      && Number.isFinite(route(partnerPosition, depotFor(partnerPosition, true), true).cost);
+    if (!safeDelivery) return { operation: "share", cell: position };
+  }
   if (state.depots.includes(position) && state.water[seat] <= 1) return { operation: "refill", cell: position };
   const nearbyHazards = state.fire.map((level, cell) => ({ level, cell }))
     .filter(({ level, cell }) => level > 0 && emberDistance(position, cell) <= 1 && !partnerClears(cell))

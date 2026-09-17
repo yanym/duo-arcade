@@ -6,9 +6,13 @@ import { createEmberCrewState, DEFAULT_GAME_OPTIONS, planEmberAction, type Ember
 import { LanguageContext } from "@/i18n";
 import { EmberCrewGame } from "./EmberCrewGame";
 
-vi.mock("react-native", () => vi.importActual<typeof import("react-native")>("react-native-web"));
+const { viewport } = vi.hoisted(() => ({ viewport: { width: 1024, height: 768, scale: 1, fontScale: 1 } }));
+vi.mock("react-native", async () => ({
+  ...await vi.importActual<typeof import("react-native")>("react-native-web"),
+  useWindowDimensions: () => viewport,
+}));
 vi.mock("@/settings/SettingsContext", () => ({ useSettings: () => ({ feedback: vi.fn(), settings: { highContrast: false, reducedMotion: true } }) }));
-afterEach(cleanup);
+afterEach(() => { cleanup(); viewport.width = 1024; viewport.fontScale = 1; });
 const initial = () => createEmberCrewState(1000, 42, DEFAULT_GAME_OPTIONS);
 const jointRoute = () => {
   const fire = Array<number>(25).fill(0);
@@ -29,6 +33,58 @@ const forecastMove = (): EmberCrewState => {
 };
 
 describe("Ember Crew interaction", () => {
+  it.each([320, 375, 390, 414])("groups full-size tools into two rows at %s px without losing accessible action names", (width) => {
+    viewport.width = width;
+    render(<LanguageContext.Provider value="en"><EmberCrewGame game={initial()} ownSeat={0} phase="playing" now={1001}
+      playerNames={["Alex", "Sam"]} partnerIsAi onPlan={vi.fn()} onCommit={vi.fn()} /></LanguageContext.Provider>);
+    expect(screen.getByText("AI adapts until you confirm.")).toBeTruthy();
+    expect(screen.getByText(/2 · Sam/)).toBeTruthy();
+    expect(screen.getByText("Tap an adjacent tile to plan.")).toBeTruthy();
+    for (const [name, label, basis] of [
+      ["Move", "Move", "45%"], ["Put out fire", "Put out fire", "45%"],
+      ["Refill tank", "Refill", "27%"], ["Share water", "Share water", "27%"], ["Hold position", "Wait", "27%"],
+    ]) {
+      const control = screen.getByRole("button", { name });
+      expect(control.textContent).toBe(label);
+      expect(getComputedStyle(control).flexBasis).toBe(basis);
+      expect(Number.parseFloat(getComputedStyle(control).minHeight)).toBeGreaterThanOrEqual(48);
+    }
+    expect(screen.getAllByText("Water 4/4")).toHaveLength(2);
+  });
+
+  it("keeps the roomy layout for larger text on a small screen", () => {
+    viewport.width = 320; viewport.fontScale = 1.6;
+    render(<LanguageContext.Provider value="en"><EmberCrewGame game={initial()} ownSeat={0} phase="playing" now={1001}
+      playerNames={["Alex", "Sam"]} partnerIsAi onPlan={vi.fn()} onCommit={vi.fn()} /></LanguageContext.Provider>);
+    expect(screen.getByText("Sam")).toBeTruthy();
+    expect(screen.getByText("AI adapts to your plan. Confirm when ready.")).toBeTruthy();
+    const refill = screen.getByRole("button", { name: "Refill tank" });
+    expect(refill.textContent).toBe("Refill tank");
+    expect(getComputedStyle(refill).flexBasis).not.toBe("27%");
+  });
+
+  it("still requires a synced draft and separate confirmation after a compact refill selection", () => {
+    viewport.width = 320;
+    const game = initial(); game.water[0] = 1;
+    const onPlan = vi.fn(); const onCommit = vi.fn();
+    render(<LanguageContext.Provider value="en"><EmberCrewGame game={game} ownSeat={0} phase="playing" now={1001}
+      onPlan={onPlan} onCommit={onCommit} /></LanguageContext.Provider>);
+    fireEvent.click(screen.getByRole("button", { name: "Refill tank" }));
+    expect(onPlan).toHaveBeenCalledWith({ operation: "refill", cell: game.positions[0] });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm plan" }));
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it("preserves a forecast danger warning and coordinated-route guidance in the compact layout", () => {
+    viewport.width = 320;
+    const game = forecastMove(); game.plans[1] = null;
+    const props = { ownSeat: 0 as const, phase: "playing" as const, now: 1001, onPlan: vi.fn(), onCommit: vi.fn() };
+    const view = render(<LanguageContext.Provider value="en"><EmberCrewGame {...props} game={game} /></LanguageContext.Provider>);
+    expect(screen.getByText("This tile is forecast to burn after you move. Change your route or clear the source.")).toBeTruthy();
+    view.rerender(<LanguageContext.Provider value="en"><EmberCrewGame {...props} game={jointRoute()} /></LanguageContext.Provider>);
+    expect(screen.getByText("Confirm together: your partner clears the fire, then you move.")).toBeTruthy();
+  });
+
   it("warns before moving into forecast fire without taking away the player's choice", () => {
     const game = forecastMove();
     game.plans[1] = null;

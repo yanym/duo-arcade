@@ -1,5 +1,5 @@
 import { memo, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { EMBER_OPERATIONS, emberDistance, validateEmberPlan, type EmberCrewState, type EmberOperation, type EmberPlan, type Seat } from "@duo/game-core";
 import type { RoomPhase } from "@duo/protocol";
 import { Text } from "@/components/ScaledText";
@@ -18,11 +18,16 @@ type Props = {
 const operationNames: Record<EmberOperation, string> = {
   move: "规划移动", extinguish: "灭火", refill: "补满水箱", share: "给搭档水", wait: "原地待命",
 };
+const compactOperationNames: Record<EmberOperation, string> = {
+  ...operationNames, refill: "补水", share: "分水", wait: "待命",
+};
 const coordinates = (cell: number) => `${"ABCDE"[cell % 5]}${Math.floor(cell / 5) + 1}`;
 
 export const EmberCrewGame = memo(function EmberCrewGame({ game, ownSeat, phase, now, pending = false, playerNames, playerConnected, partnerIsAi = false, onPlan, onCommit }: Props) {
   const { t } = useI18n();
   const { settings, feedback } = useSettings();
+  const { width, fontScale } = useWindowDimensions();
+  const compact = width < 600 && fontScale <= 1.2;
   const [operation, setOperation] = useState<EmberOperation>(() => game.plans[ownSeat]?.operation ?? "move");
   const partner: Seat = ownSeat === 0 ? 1 : 0;
   const ended = Boolean(game.result) || phase === "completed";
@@ -62,7 +67,8 @@ export const EmberCrewGame = memo(function EmberCrewGame({ game, ownSeat, phase,
         : pending ? "正在同步你的计划"
           : game.locked[ownSeat] ? "已确认，等待搭档"
             : game.locked[partner] ? "搭档已确认，轮到你决定"
-              : partnerIsAi ? "AI 会随你的计划调整，准备好后请确认。" : "共同规划，分别确认";
+              : partnerIsAi ? compact ? "确认前，AI 会调整计划。" : "AI 会随你的计划调整，准备好后请确认。"
+                : compact ? "一起规划，再分别确认。" : "共同规划，分别确认";
   const planCopy = (seat: Seat) => {
     const plan = game.plans[seat];
     if (ended) return t(plan ? "计划未执行" : "尚未行动");
@@ -75,8 +81,8 @@ export const EmberCrewGame = memo(function EmberCrewGame({ game, ownSeat, phase,
   const allFiresOut = !game.fire.some(Boolean);
   const forecast = allFiresOut ? t("火势已全部扑灭") : `${t("本轮火势预告")} · ${game.forecast.map(coordinates).join(" · ")}`;
   return (
-    <View style={[styles.shell, settings.highContrast && styles.contrast]}>
-      <View style={styles.metrics}>
+    <View style={[styles.shell, compact && styles.compactShell, settings.highContrast && styles.contrast]}>
+      <View style={[styles.metrics, compact && styles.compactMetrics]}>
         <View><Text style={styles.caption}>居民撤离</Text><Text style={styles.value}>{game.rescued}/{game.target}</Text></View>
         <View><Text style={styles.caption}>楼体完整度</Text><Text style={[styles.value, game.integrity <= game.maxIntegrity / 3 && styles.danger]}>{game.integrity}/{game.maxIntegrity}</Text></View>
         <View><Text style={styles.caption}>回合</Text><Text style={styles.value}>{game.round}/{game.maxRounds}</Text></View>
@@ -84,15 +90,15 @@ export const EmberCrewGame = memo(function EmberCrewGame({ game, ownSeat, phase,
       <Text accessibilityLiveRegion="polite" style={styles.status}>{stateCopy}</Text>
       <View style={styles.players}>
         {([ownSeat, partner] as Seat[]).map((seat) => (
-          <View key={seat} style={[styles.player, seat === ownSeat ? styles.own : styles.partner]}>
-            <Text style={styles.playerName}>{seat + 1} · {t(seat === ownSeat ? "你" : "搭档")} {playerConnected?.[seat] === false ? t("离线") : ended ? "" : game.locked[seat] ? "✓" : "…"}</Text>
-            {playerNames && <Text numberOfLines={1} style={styles.caption}>{playerNames[seat]}</Text>}
+          <View key={seat} style={[styles.player, compact && styles.compactPlayer, seat === ownSeat ? styles.own : styles.partner]}>
+            <Text numberOfLines={compact ? 1 : undefined} style={styles.playerName}>{seat + 1} · {compact && seat === partner && playerNames ? playerNames[seat] : t(seat === ownSeat ? "你" : "搭档")} {playerConnected?.[seat] === false ? t("离线") : ended ? "" : game.locked[seat] ? "✓" : "…"}</Text>
+            {!compact && playerNames && <Text numberOfLines={1} style={styles.caption}>{playerNames[seat]}</Text>}
             <Text style={styles.plan}>{game.phase === "round_result" ? t(game.report[seat]) : planCopy(seat)}</Text>
             <Text style={styles.caption}>{t("水量")} {game.water[seat]}/4{game.carrying[seat] ? ` · ${t("正护送居民")}` : ""}</Text>
           </View>
         ))}
       </View>
-      <View style={[styles.forecast, allFiresOut && styles.allClear]}><Text style={[styles.forecastText, allFiresOut && styles.allClearText]}>{ended ? t("救援行动结束") : game.phase === "round_result" ? t("本轮行动已完成") : forecast}</Text></View>
+      <View style={[styles.forecast, compact && styles.compactForecast, allFiresOut && styles.allClear]}><Text style={[styles.forecastText, allFiresOut && styles.allClearText]}>{ended ? t("救援行动结束") : game.phase === "round_result" ? t("本轮行动已完成") : forecast}</Text></View>
       <View style={styles.board}>
         {Array.from({ length: 5 }, (_, row) => (
           <View key={row} style={styles.boardRow}>
@@ -134,13 +140,17 @@ export const EmberCrewGame = memo(function EmberCrewGame({ game, ownSeat, phase,
           const direct = op !== "move" && op !== "extinguish";
           const available = direct ? validateEmberPlan(game, ownSeat, { operation: op, cell: game.positions[ownSeat] }) === null
             : Array.from({ length: 25 }, (_, cell) => validateEmberPlan(game, ownSeat, { operation: op, cell })).some((error) => error === null);
-          return <Button key={op} style={styles.operation} variant={operation === op ? "primary" : "ghost"}
-            selected={operation === op} disabled={!canPlan || !available} onPress={() => chooseOperation(op)}>{operationNames[op]}</Button>;
+          return <Button key={op} style={[styles.operation, compact && (direct ? styles.compactSupportOperation : styles.compactTargetOperation)]}
+            accessibilityLabel={operationNames[op]} variant={operation === op ? "primary" : "ghost"}
+            selected={operation === op} disabled={!canPlan || !available} onPress={() => chooseOperation(op)}>{compact ? compactOperationNames[op] : operationNames[op]}</Button>;
         })}
       </View>
       {isPlanning && <Text accessibilityLiveRegion={forecastMoveCopy ? "polite" : undefined}
         style={[styles.instruction, forecastMoveCopy && (forecastPrevented ? styles.coordinated : styles.warning)]}>
-        {forecastMoveCopy ?? (operation === "move" ? "点相邻格规划移动；有火的道路可让搭档在同轮清出。" : operation === "extinguish" ? "点自己或相邻格的火势，消耗一格水将它扑灭。" : "计划已选好，确认后等待搭档一起行动。")}
+        {forecastMoveCopy ?? (operation === "move"
+          ? compact ? "点相邻格，规划移动。" : "点相邻格规划移动；有火的道路可让搭档在同轮清出。"
+          : operation === "extinguish" ? compact ? "点身边火势，消耗 1 格水。" : "点自己或相邻格的火势，消耗一格水将它扑灭。"
+            : "计划已选好，确认后等待搭档一起行动。")}
       </Text>}
       {coordinatedRoute ? <Text accessibilityLiveRegion="polite" style={styles.coordinated}>
         {ownPlan.operation === "move" ? "双方确认后，搭档先灭火，你再通过。" : "双方确认后，你先灭火，搭档再通过。"}
@@ -156,18 +166,22 @@ export const EmberCrewGame = memo(function EmberCrewGame({ game, ownSeat, phase,
 
 const styles = StyleSheet.create({
   shell: { backgroundColor: colors.surface, borderRadius: radii.large, padding: 10, gap: 8, borderWidth: 1, borderColor: colors.faint },
+  compactShell: { gap: 6 },
   contrast: { borderColor: colors.ink, borderWidth: 2 },
   metrics: { flexDirection: "row", justifyContent: "space-between", backgroundColor: colors.canvas, padding: 8, borderRadius: radii.medium },
+  compactMetrics: { paddingVertical: 6 },
   caption: { color: colors.muted, fontSize: 12, lineHeight: 18 },
   value: { color: colors.ink, fontSize: 22, fontWeight: "800" },
   danger: { color: colors.danger },
   status: { color: colors.primaryDark, fontWeight: "800", fontSize: 15 },
   players: { flexDirection: "row", gap: 8 },
   player: { flex: 1, padding: 8, borderRadius: radii.small, gap: 2 },
+  compactPlayer: { padding: 6 },
   own: { backgroundColor: colors.primarySoft }, partner: { backgroundColor: colors.tealSoft },
   playerName: { color: colors.ink, fontSize: 14, fontWeight: "800" },
   plan: { color: colors.ink, fontSize: 13, lineHeight: 18 },
   forecast: { backgroundColor: colors.coralSoft, padding: 9, borderRadius: radii.small },
+  compactForecast: { paddingVertical: 6 },
   forecastText: { color: colors.coralInk, fontSize: 12, fontWeight: "700" },
   allClear: { backgroundColor: colors.tealSoft },
   allClearText: { color: colors.tealInk },
@@ -188,6 +202,8 @@ const styles = StyleSheet.create({
   legend: { fontSize: 12, color: colors.muted, textAlign: "center" },
   controls: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   operation: { flexGrow: 1, minHeight: 48, paddingHorizontal: 12 },
+  compactTargetOperation: { flexBasis: "45%", paddingHorizontal: 6 },
+  compactSupportOperation: { flexBasis: "27%", paddingHorizontal: 6 },
   instruction: { color: colors.ink, fontSize: 13, lineHeight: 19 },
   warning: { color: colors.coralInk, fontSize: 13, lineHeight: 19 },
   coordinated: { color: colors.tealInk, backgroundColor: colors.tealSoft, padding: 9, borderRadius: radii.small, fontSize: 13, lineHeight: 19 },

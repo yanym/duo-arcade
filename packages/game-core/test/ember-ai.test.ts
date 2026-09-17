@@ -11,6 +11,45 @@ function aiStep(game: EmberCrewState, seat: Seat) {
 }
 
 describe("Ember AI follows a revisable shared plan", () => {
+  it.each([0, 1] as Seat[])("does not give water back to a safely evacuating partner from AI seat %s", (ai) => {
+    const human = ai === 0 ? 1 : 0;
+    const game = createEmberCrewState(1000, 42, DEFAULT_GAME_OPTIONS);
+    game.walls = []; game.fire = Array(25).fill(0); game.forecast = [];
+    game.positions = [21, 21]; game.carrying = [true, true]; game.civilians = []; game.target = 2;
+    game.water[ai] = 2; game.water[human] = 0;
+    game.plans[human] = { operation: "move", cell: 20 };
+    const planned = aiStep(game, ai);
+    expect(planned.plans[ai]).toEqual({ operation: "move", cell: 20 });
+    expect(planned.water).toEqual(game.water);
+    const committed = applyGameAction(planned, human, { kind: "ember_commit", round: game.round }, 2000);
+    if (!committed.ok || committed.state.kind !== "ember_crew") throw new Error("Human confirmation rejected");
+    const result = aiStep(committed.state, ai);
+    expect(result.rescued).toBe(2);
+    expect(result.result?.kind).toBe("success");
+    expect(result.water).toEqual(game.water);
+  });
+
+  it.each([0, 1] as Seat[])("lets AI seat %s use received water on an intense fire instead of returning it unnecessarily", (ai) => {
+    const human = ai === 0 ? 1 : 0;
+    const game = createEmberCrewState(1000, 42, DEFAULT_GAME_OPTIONS);
+    game.walls = []; game.fire = Array(25).fill(0); game.forecast = [];
+    game.fire[3] = 2; game.positions = [2, 2]; game.carrying = [true, true]; game.civilians = [];
+    game.water[ai] = 2; game.water[human] = 0;
+    game.plans[human] = { operation: "move", cell: 1 };
+    expect(aiStep(game, ai).plans[ai]).toEqual({ operation: "extinguish", cell: 3 });
+  });
+
+  it.each([0, 1] as Seat[])("still lets AI seat %s supply a carrying partner whose exits require firefighting", (ai) => {
+    const human = ai === 0 ? 1 : 0;
+    const game = createEmberCrewState(1000, 42, DEFAULT_GAME_OPTIONS);
+    game.walls = []; game.fire = Array(25).fill(0); game.forecast = [];
+    for (const cell of [15, 21, 19, 23]) game.fire[cell] = 1;
+    game.positions[ai] = 12; game.positions[human] = 11; game.carrying = [true, true];
+    game.water[ai] = 2; game.water[human] = 0;
+    game.plans[human] = { operation: "wait", cell: 11 };
+    expect(aiStep(game, ai).plans[ai]).toEqual({ operation: "share", cell: 12 });
+  });
+
   it.each(([0, 1] as Seat[]).flatMap((ai) => [0, 4].map((water) => [ai, water] as const)))("does not let AI seat %s with %s water take a resident the human is already moving to", (ai, water) => {
     const human = ai === 0 ? 1 : 0;
     let game = createEmberCrewState(1000, 2, DEFAULT_GAME_OPTIONS);
