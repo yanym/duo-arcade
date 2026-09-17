@@ -2,6 +2,8 @@ import { Children, forwardRef, useContext, type ComponentRef, type ReactNode } f
 import {
   Text as NativeText,
   TextInput as NativeTextInput,
+  Platform,
+  useWindowDimensions,
   type TextInputProps,
   type TextProps,
 } from "react-native";
@@ -23,12 +25,21 @@ export const Text = forwardRef<ComponentRef<typeof NativeText>, TextProps>(funct
   ref,
 ) {
   const language = useContext(LanguageContext);
+  const { fontScale } = useWindowDimensions();
+  const fontScaleLimit = maxFontSizeMultiplier ?? 0;
+  // iOS can redraw a live Dynamic Type change using the previous paragraph's
+  // measured width. Refresh that native paragraph only when its rendered size
+  // changes; keep editable inputs mounted so typing/focus are never discarded.
+  const measurementKey = Platform.OS === "ios" && props.allowFontScaling !== false
+    ? Math.min(fontScale, fontScaleLimit > 0 ? fontScaleLimit : fontScale)
+    : "text";
   const translatedChildren = Children.map(children as ReactNode, (child) =>
     typeof child === "string" ? translateTextChild(child, language) : child,
   );
   return (
     <NativeText
       {...props}
+      key={measurementKey}
       accessibilityLabel={accessibilityLabel ? translate(accessibilityLabel, language) : undefined}
       accessibilityRole={accessibilityRole}
       maxFontSizeMultiplier={maxFontSizeMultiplier}

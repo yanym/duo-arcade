@@ -39,7 +39,7 @@ export function GameCard({
       <View style={[styles.icon, styles[`${accent}Icon`]]}>
         <Text style={styles.iconText}>{icon}</Text>
       </View>
-      <View style={styles.copy}>
+      <View>
         <View style={styles.titleRow}>
           <Text style={styles.title}>{title}</Text>
           {selected && <Text style={[styles.badge, styles.liveBadge]}>已选择</Text>}
@@ -78,7 +78,6 @@ const styles = StyleSheet.create({
   coralIcon: { backgroundColor: colors.coralSoft },
   tealIcon: { backgroundColor: colors.tealSoft },
   iconText: { fontSize: 21, fontWeight: "800" },
-  copy: { flex: 1 },
   titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
   title: { flex: 1, minWidth: 0, color: colors.ink, fontSize: 19, fontWeight: "900" },
   badge: { flexShrink: 0, overflow: "hidden", paddingHorizontal: 9, paddingVertical: 4, borderRadius: radii.pill, fontSize: 11, fontWeight: "800" },

@@ -84,6 +84,16 @@ afterEach(() => {
 });
 
 describe("English home and solo entry", () => {
+  it("lets library copy size intrinsically inside the native wrapping card grid", async () => {
+    render(<LanguageContext.Provider value="en"><HomeScreen /></LanguageContext.Provider>);
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "Your game nickname" })).toBeTruthy());
+    const card = screen.getByRole("radio", { name: /Ember Crew/ });
+    const description = within(card).getByText("Plan routes, fight fires, and bring residents to safety. Every move is your decision.");
+    // A growing vertical column inside an unconstrained wrapped card made native
+    // Yoga stretch each row past the grid's measured height, overlapping the footer.
+    expect(getComputedStyle(description.parentElement!).flexGrow).not.toBe("1");
+  });
+
   it.each([[320, 568], [320, 740], [390, 844]])("prioritizes room controls over repeated steps at %s×%s", async (width, height) => {
     mocks.dimensions = { width, height, scale: 1, fontScale: 1 };
     render(<LanguageContext.Provider value="en"><HomeScreen /></LanguageContext.Provider>);
